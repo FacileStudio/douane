@@ -9,12 +9,11 @@ import (
 	"github.com/FacileStudio/douane/internal/store"
 )
 
-func history(dbPath string, report *output.Report) error {
-	st, err := store.Open(dbPath)
-	if err != nil {
-		return err
-	}
-	defer st.Close()
+// history marks findings unseen by the previous sweep of this target and
+// records the current one. The store is passed in already open: a fleet sweep
+// reuses one handle for every repo, and it is the same handle the feed cache
+// lives in.
+func history(st *store.Store, report *output.Report) error {
 	previous, err := st.PreviousKeys(report.Target)
 	if err != nil {
 		return err

@@ -2,7 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"time"
 
 	"github.com/FacileStudio/douane/internal/finding"
 	_ "modernc.org/sqlite"
@@ -40,7 +39,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.Exec(schema + cacheSchema); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -86,7 +85,7 @@ func (s *Store) Save(target string, packages int, fs []finding.Finding) error {
 	defer tx.Rollback()
 
 	res, err := tx.Exec(`INSERT INTO sweeps (target, started, packages) VALUES (?, ?, ?)`,
-		target, time.Now().UTC().Format(time.RFC3339), packages)
+		target, stamp(), packages)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,8 @@ Customs for your dependencies. `douane` reads a project's lockfiles, asks
 actually exploiting it, and prints only what is worth acting on.
 
 ```sh
-douane scan ~/Code/Facile/Glure
+douane scan ~/Code/Facile/Glure     # one project
+douane sweep ~/Code/Facile          # every repository under a directory
 ```
 
 ```
@@ -39,13 +40,20 @@ The repo is private, so `go install github.com/FacileStudio/douane@latest` needs
 ## Usage
 
 ```sh
-douane scan [path] [flags]
+douane scan  [path] [flags]   inspect one project
+douane sweep [dir]  [flags]   inspect every repository under a directory
 
   -format auto|text|line|json   output shape (default auto)
   -fail   never|low|medium|high|critical|kev   exit 1 at or above (default never)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
+  -refresh                      refetch the feeds, ignoring the cache
 ```
+
+`sweep` takes the repositories directly under `dir`, resolves the **union** of their
+packages in one pass, and hands the results back per repository. Sibling projects share
+most of their dependency tree, so a fleet of 27 repos is far closer to one scan than to 27
+— and the feeds are fetched once, not once per repo.
 
 `-format auto` prints the human report on a terminal and the one-per-line form everywhere
 else, so pipes and agent tool calls get the parseable version without asking.
@@ -74,7 +82,8 @@ from a fix you have not taken yet. douane never conflates the two.
 | `Cargo.lock` | crates.io |
 
 `bun.lockb` is binary and cannot be read: douane **errors** rather than silently reporting
-zero packages, because a false negative is the worst failure a scanner can have. Run
+zero packages, because a false negative is the worst failure a scanner can have. In a sweep
+the other repositories still complete, and the run exits 2. Run
 `bun install --save-text-lockfile` to emit `bun.lock`.
 
 ## Known limitations
@@ -83,7 +92,9 @@ zero packages, because a false negative is the worst failure a scanner can have.
   Ranking degrades gracefully, since KEV and EPSS are consulted first.
 - **No reachability analysis.** Every finding says `reachable: null`, meaning *unchecked* —
   never *unreachable*. `govulncheck` integration is the next milestone.
-- **Feeds are fetched every run**, not cached. Fine for one repo, wasteful for a sweep.
+- **KEV carries this fleet no signal.** Zero of 732 findings across the suite are on the
+  known-exploited list. It stays first in the ranking because one hit would matter, but do
+  not expect it to fire.
 
 See [ROADMAP.md](ROADMAP.md).
 

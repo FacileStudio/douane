@@ -36,8 +36,10 @@ func Resolve(f Format, w *os.File) Format {
 
 // Report is one sweep's result, ready to render.
 type Report struct {
+	Name     string            `json:"name,omitempty"`
 	Target   string            `json:"target"`
 	Packages int               `json:"packages"`
+	Failed   bool              `json:"failed,omitempty"`
 	Findings []finding.Finding `json:"findings"`
 	New      map[string]bool   `json:"-"`
 	Warnings []string          `json:"warnings,omitempty"`
@@ -58,19 +60,25 @@ func Write(w io.Writer, f Format, r Report) error {
 }
 
 func writeLine(w io.Writer, r Report) error {
+	return writeLinePrefixed(w, "", r)
+}
+
+// writeLinePrefixed renders the greppable form, tagging every line with prefix
+// so a fleet sweep says which repo a finding came from.
+func writeLinePrefixed(w io.Writer, prefix string, r Report) error {
 	for _, f := range r.Findings {
 		fix := f.FixedIn
 		if fix == "" {
 			fix = "no-fix"
 		}
-		if _, err := fmt.Fprintf(w, "%s:%s@%s: %s: %s [%s epss=%.4f kev=%t fix=%s]\n",
-			f.Ecosystem, f.Package, f.Installed, strings.ToLower(f.Severity.String()),
+		if _, err := fmt.Fprintf(w, "%s%s:%s@%s: %s: %s [%s epss=%.4f kev=%t fix=%s]\n",
+			prefix, f.Ecosystem, f.Package, f.Installed, strings.ToLower(f.Severity.String()),
 			f.ID, f.Target, f.Exploit.EPSS, f.Exploit.KEV, fix); err != nil {
 			return err
 		}
 	}
 	for _, warn := range r.Warnings {
-		if _, err := fmt.Fprintf(w, "douane: warning: %s\n", warn); err != nil {
+		if _, err := fmt.Fprintf(w, "douane: warning: %s%s\n", prefix, warn); err != nil {
 			return err
 		}
 	}
