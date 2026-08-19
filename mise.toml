@@ -1,0 +1,14 @@
+[tools]
+go = "1.25"
+
+[tasks.build]
+run = "go build -o douane ."
+
+[tasks.test]
+run = "go test ./..."
+
+[tasks.check]
+run = "filet check"
+
+[tasks.install]
+run = "GOBIN=$HOME/go/bin go install ."

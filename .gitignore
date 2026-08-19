@@ -1,0 +1,6 @@
+/douane
+/dist/
+*.db
+*.db-wal
+*.db-shm
+douane.local.yml
