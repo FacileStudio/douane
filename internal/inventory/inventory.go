@@ -32,6 +32,16 @@ var parsers = []parser{
 	{"Cargo.lock", parseCargoLock},
 }
 
+// Lockfiles lists the lockfile names douane recognises, so a caller can tell
+// a project directory from any other directory without duplicating the list.
+func Lockfiles() []string {
+	out := make([]string, 0, len(parsers))
+	for _, p := range parsers {
+		out = append(out, p.file)
+	}
+	return out
+}
+
 // Scan walks root and returns every dependency declared by a lockfile it
 // recognises. Directories holding installed artefacts rather than sources are
 // skipped, so a vendored copy is never mistaken for a declared dependency.

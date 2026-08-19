@@ -13,15 +13,37 @@ const (
 	kevURL      = "https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json"
 	epssURL     = "https://api.first.org/data/v1/epss"
 	epssPerCall = 100
+	kevFeed     = "kev"
+	feedTTL     = 24 * time.Hour
 )
 
+// scoreUnknown records that EPSS was asked about a CVE and had no score for it.
+// Without it every unscored advisory is re-queried on every run, and a sweep
+// over a warm cache still talks to the network.
+const scoreUnknown = -1
+
+// Cache keeps feed data between runs. KEV is one catalogue, so it is cached
+// whole; EPSS answers per CVE, so it is cached per CVE and only the missing
+// ones are ever fetched.
+type Cache interface {
+	Feed(name string) ([]byte, time.Time, error)
+	SaveFeed(name string, payload []byte) error
+	EPSS(since time.Time) (map[string]float64, error)
+	SaveEPSS(scores map[string]float64) error
+}
+
 // Result reports which feeds answered. A feed being unreachable degrades the
-// ranking, it never fails the sweep — but the caller must be able to say so.
+// ranking, it never fails the sweep — but the caller must be able to say so,
+// including when the answer came from a cache that is past its TTL.
 type Result struct {
-	KEVOK   bool
-	EPSSOK  bool
-	KEVErr  error
-	EPSSErr error
+	KEVOK     bool
+	EPSSOK    bool
+	KEVErr    error
+	EPSSErr   error
+	KEVAge    time.Duration
+	KEVStale  bool
+	EPSSStale bool
+	CacheErr  error
 }
 
 // Enricher annotates findings with real-world exploitation signals.
@@ -29,6 +51,8 @@ type Enricher struct {
 	http    *http.Client
 	kevURL  string
 	epssURL string
+	cache   Cache
+	refresh bool
 }
 
 // New returns an Enricher pointed at the public KEV and EPSS feeds.
@@ -40,10 +64,24 @@ func New() *Enricher {
 	}
 }
 
+// WithCache makes the Enricher read and write feed data through c. Pass a real
+// cache or leave it unset — a nil pointer wrapped in the interface is not the
+// same as no cache, and will panic on first use.
+func (e *Enricher) WithCache(c Cache) *Enricher {
+	e.cache = c
+	return e
+}
+
+// WithRefresh forces a fetch even when the cached feeds are still fresh.
+func (e *Enricher) WithRefresh(v bool) *Enricher {
+	e.refresh = v
+	return e
+}
+
 // Apply fills the exploitation signals of every finding in place.
 func (e *Enricher) Apply(ctx context.Context, fs []finding.Finding) Result {
 	var res Result
-	kev, err := e.kev(ctx)
+	kev, err := e.kevCatalog(ctx, &res)
 	if err != nil {
 		res.KEVErr = err
 	} else {
@@ -51,7 +89,7 @@ func (e *Enricher) Apply(ctx context.Context, fs []finding.Finding) Result {
 		applyKEV(fs, kev)
 	}
 
-	scores, err := e.epss(ctx, cveIDs(fs))
+	scores, err := e.epssScores(ctx, cveIDs(fs), &res)
 	if err != nil {
 		res.EPSSErr = err
 		return res

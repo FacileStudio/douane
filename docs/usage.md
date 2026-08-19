@@ -13,6 +13,52 @@ Defaults to the current directory.
 | `-fail` | `never`, `low`, `medium`, `high`, `critical`, `kev` | `never` | Exit 1 at or above |
 | `-db` | path, or `""` | `~/.douane.db` | Sweep history; `""` disables it |
 | `-no-enrich` | — | off | Skip the KEV and EPSS feeds |
+| `-refresh` | — | off | Refetch the feeds, ignoring the cache |
+
+## `douane sweep [dir]`
+
+Scans every repository directly under `dir` and reports across all of them, grouped by
+repository and ranked globally. A directory counts as a repository when it holds a `.git`
+or a lockfile at its top level; `sweep` does not recurse past that, so a monorepo is one
+repository, not one per app.
+
+Takes the same flags as `scan`. A repository with an unreadable lockfile does not stop the
+others — it is reported, skipped, and counted in the summary — but the sweep still exits 2,
+because a repository that silently leaves the fleet is a false negative, not a clean run.
+
+```
+GFConseil — 122 held out of 1065 packages
+
+HIGH      CVE-2026-44578 next@16.0.10
+          epss 38.87% · fix 16.2.5 · npm · package-lock.json
+          ...
+
+  GFConseil    122 findings    1065 packages
+  LauraHerve    92 findings     808 packages
+  ...
+
+732 held out of 8175 packages across 27 repos — 2 clear
+```
+
+### Why it is not a loop over `scan`
+
+The packages of sibling projects overlap almost completely, so `sweep` collects every
+inventory first, resolves the **union** once, and splits the findings back out per
+repository. Each repository still reports its own lockfile paths and its own history diff.
+
+## Feed cache
+
+KEV and EPSS are cached in the sweep database for 24 hours — the catalogue whole, EPSS one
+row per CVE, including the CVEs it has no score for so they are not re-queried. A second
+run inside the TTL makes no request to either feed.
+
+If a feed is unreachable and the cache has expired, douane uses it anyway and says so:
+
+```
+  ! KEV feed unreachable — using a cached catalogue from 31h ago
+```
+
+`-refresh` forces a fetch. `-db ""` disables the database, and with it the cache.
 
 ### Formats
 

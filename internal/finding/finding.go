@@ -96,10 +96,13 @@ func (f Finding) Key() string {
 // Rank sorts findings by what should be acted on first: known-exploited,
 // then likelihood of exploitation, then severity, then a stable tiebreak.
 func Rank(fs []Finding) {
-	sort.SliceStable(fs, func(i, j int) bool { return less(fs[i], fs[j]) })
+	sort.SliceStable(fs, func(i, j int) bool { return Less(fs[i], fs[j]) })
 }
 
-func less(a, b Finding) bool {
+// Less reports whether a should be acted on before b. It is what Rank sorts
+// by, exported so a fleet report can order repos by their worst finding
+// without a second, quietly different, notion of "worst".
+func Less(a, b Finding) bool {
 	switch {
 	case a.Exploit.KEV != b.Exploit.KEV:
 		return a.Exploit.KEV

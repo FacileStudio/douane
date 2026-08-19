@@ -6,24 +6,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/FacileStudio/douane/internal/enrich"
 	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/inventory"
-	"github.com/FacileStudio/douane/internal/osv"
 	"github.com/FacileStudio/douane/internal/output"
+	"github.com/FacileStudio/douane/internal/store"
 )
 
 const usage = `douane — customs for your dependencies
 
 Usage:
-  douane scan [path] [flags]
+  douane scan  [path] [flags]   inspect one project
+  douane sweep [dir]  [flags]   inspect every repository under a directory
 
 Flags:
   -format auto|text|line|json   output shape (default auto)
   -fail   never|low|medium|high|critical|kev   exit 1 at or above (default never)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
+  -refresh                      refetch the feeds, ignoring the cache
 
 Exit codes: 0 clear, 1 findings at or above -fail, 2 bad usage or unreadable input.
 `
@@ -37,6 +40,8 @@ func Run(args []string) int {
 	switch args[0] {
 	case "scan":
 		return runScan(args[1:])
+	case "sweep":
+		return runSweep(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return 0
@@ -52,16 +57,18 @@ type options struct {
 	failOn   string
 	dbPath   string
 	noEnrich bool
+	refresh  bool
 }
 
-func parseArgs(args []string) (options, int) {
+func parseArgs(name string, args []string) (options, int) {
 	opts := options{path: ".", dbPath: defaultDB()}
-	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	fs.StringVar(&opts.format, "format", "auto", "")
 	fs.StringVar(&opts.failOn, "fail", "never", "")
 	fs.StringVar(&opts.dbPath, "db", opts.dbPath, "")
 	fs.BoolVar(&opts.noEnrich, "no-enrich", false, "")
+	fs.BoolVar(&opts.refresh, "refresh", false, "")
 
 	if len(args) > 0 && args[0] != "" && args[0][0] != '-' {
 		opts.path, args = args[0], args[1:]
@@ -73,7 +80,7 @@ func parseArgs(args []string) (options, int) {
 }
 
 func runScan(args []string) int {
-	opts, code := parseArgs(args)
+	opts, code := parseArgs("scan", args)
 	if code != 0 {
 		return code
 	}
@@ -82,10 +89,16 @@ func runScan(args []string) int {
 		fmt.Fprintf(os.Stderr, "douane: unknown -fail value %q\n", opts.failOn)
 		return 2
 	}
-	report, code := sweep(context.Background(), opts)
+	st, warnings := openStore(opts.dbPath)
+	if st != nil {
+		defer st.Close()
+	}
+	report, code := scanOne(context.Background(), opts, st)
 	if code != 0 {
 		return code
 	}
+	report.Warnings = append(warnings, report.Warnings...)
+
 	form := output.Resolve(output.Format(opts.format), os.Stdout)
 	if err := output.Write(os.Stdout, form, report); err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
@@ -97,7 +110,21 @@ func runScan(args []string) int {
 	return 0
 }
 
-func sweep(ctx context.Context, opts options) (output.Report, int) {
+// openStore opens the sweep database, which carries both the history and the
+// feed cache. A database that will not open costs history and caching, never
+// the sweep itself.
+func openStore(path string) (*store.Store, []string) {
+	if path == "" {
+		return nil, nil
+	}
+	st, err := store.Open(path)
+	if err != nil {
+		return nil, []string{fmt.Sprintf("sweep database unavailable: %v", err)}
+	}
+	return st, nil
+}
+
+func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report, int) {
 	target, err := filepath.Abs(opts.path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
@@ -117,12 +144,13 @@ func sweep(ctx context.Context, opts options) (output.Report, int) {
 		return output.Report{}, code
 	}
 	if !opts.noEnrich {
-		enrichReport(ctx, &report)
+		res := newEnricher(opts, st).Apply(ctx, report.Findings)
+		report.Warnings = append(report.Warnings, enrichWarnings(res)...)
 	}
 	finding.Rank(report.Findings)
 
-	if opts.dbPath != "" {
-		if err := history(opts.dbPath, &report); err != nil {
+	if st != nil {
+		if err := history(st, &report); err != nil {
 			report.Warnings = append(report.Warnings,
 				fmt.Sprintf("sweep history unavailable: %v", err))
 		}
@@ -130,72 +158,41 @@ func sweep(ctx context.Context, opts options) (output.Report, int) {
 	return report, 0
 }
 
-func resolve(ctx context.Context, pkgs []finding.Package, report *output.Report) int {
-	client := osv.New()
-	ids, err := client.Query(ctx, pkgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
-		return 2
+func newEnricher(opts options, st *store.Store) *enrich.Enricher {
+	e := enrich.New().WithRefresh(opts.refresh)
+	if st != nil {
+		e = e.WithCache(st)
 	}
-	var flat []string
-	for _, list := range ids {
-		flat = append(flat, list...)
-	}
-	vulns, err := client.Fetch(ctx, flat)
-	if err != nil {
-		report.Warnings = append(report.Warnings,
-			fmt.Sprintf("some advisories could not be fetched: %v", err))
-	}
-	report.Findings = build(pkgs, ids, vulns)
-	return 0
+	return e
 }
 
-func enrichReport(ctx context.Context, report *output.Report) {
-	res := enrich.New().Apply(ctx, report.Findings)
-	if !res.KEVOK {
-		report.Warnings = append(report.Warnings,
-			fmt.Sprintf("KEV feed unavailable, ranking degraded: %v", res.KEVErr))
+// enrichWarnings turns a feed result into what the reader needs to know: a
+// feed that answered says nothing, a feed served from an expired cache says
+// how old it is, and a feed that failed outright says why.
+func enrichWarnings(res enrich.Result) []string {
+	var out []string
+	switch {
+	case !res.KEVOK:
+		out = append(out, fmt.Sprintf("KEV feed unavailable, ranking degraded: %v", res.KEVErr))
+	case res.KEVStale:
+		out = append(out, fmt.Sprintf("KEV feed unreachable — using a cached catalogue from %s ago",
+			age(res.KEVAge)))
 	}
-	if !res.EPSSOK {
-		report.Warnings = append(report.Warnings,
-			fmt.Sprintf("EPSS feed unavailable, ranking degraded: %v", res.EPSSErr))
+	if res.CacheErr != nil {
+		out = append(out, fmt.Sprintf("feed cache not written, the next run will refetch: %v", res.CacheErr))
 	}
-}
-
-func build(pkgs []finding.Package, ids [][]string, vulns map[string]osv.Vuln) []finding.Finding {
-	var out []finding.Finding
-	seen := map[string]bool{}
-	for i, pkg := range pkgs {
-		for _, id := range ids[i] {
-			v, ok := vulns[id]
-			if !ok {
-				continue
-			}
-			f := newFinding(v, pkg)
-			if seen[f.Key()] {
-				continue
-			}
-			seen[f.Key()] = true
-			out = append(out, f)
-		}
+	switch {
+	case !res.EPSSOK:
+		out = append(out, fmt.Sprintf("EPSS feed unavailable, ranking degraded: %v", res.EPSSErr))
+	case res.EPSSStale:
+		out = append(out, "EPSS feed unreachable — ranking uses cached scores only")
 	}
 	return out
 }
 
-func newFinding(v osv.Vuln, pkg finding.Package) finding.Finding {
-	canonical, aliases := osv.Canonical(v)
-	sev, vector := osv.Severity(v)
-	return finding.Finding{
-		ID:        canonical,
-		Aliases:   aliases,
-		Summary:   v.Summary,
-		Severity:  sev,
-		CVSS:      vector,
-		Package:   pkg.Name,
-		Ecosystem: pkg.Ecosystem,
-		Installed: pkg.Version,
-		FixedIn:   osv.FixedIn(v, pkg),
-		Target:    pkg.Source,
-		Sources:   []string{"osv"},
+func age(d time.Duration) string {
+	if d < time.Hour {
+		return "under an hour"
 	}
+	return fmt.Sprintf("%dh", int(d.Hours()))
 }
