@@ -1,5 +1,12 @@
+[settings]
+lockfile = true
+
 [tools]
+lefthook = "latest"
 go = "1.25"
+
+[hooks]
+postinstall = "lefthook install"
 
 [tasks.build]
 run = "go build -o douane ."
