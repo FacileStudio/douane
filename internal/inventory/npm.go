@@ -19,15 +19,15 @@ type npmLock struct {
 
 // parseNPMLock reads a package-lock.json in either the v1 shape (dependencies)
 // or the v2/v3 shape (packages keyed by install path).
-func parseNPMLock(_ string, data []byte) ([]finding.Package, error) {
+func parseNPMLock(_ string, data []byte) ([]finding.Package, []finding.Gap, error) {
 	var lock npmLock
 	if err := json.Unmarshal(data, &lock); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if pkgs := fromPackages(lock); len(pkgs) > 0 {
-		return pkgs, nil
+		return pkgs, nil, nil
 	}
-	return fromDependencies(lock), nil
+	return fromDependencies(lock), nil, nil
 }
 
 func fromPackages(lock npmLock) []finding.Package {
@@ -42,6 +42,10 @@ func fromPackages(lock npmLock) []finding.Package {
 	return pkgs
 }
 
+// packageName reads the dependency name out of an install path. A key ending
+// exactly in "node_modules/" yields an empty name, which the collector drops
+// with a gap rather than a parser dropping it in silence: OSV refuses a whole
+// batch that carries one empty name, not just the query that holds it.
 func packageName(path string) (string, bool) {
 	idx := strings.LastIndex(path, "node_modules/")
 	if path == "" || idx < 0 {

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"github.com/FacileStudio/douane/internal/finding"
-	_ "modernc.org/sqlite"
 )
 
 const schema = `
@@ -27,24 +26,18 @@ CREATE TABLE IF NOT EXISTS findings (
 	epss      REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS findings_sweep ON findings(sweep_id);
+CREATE INDEX IF NOT EXISTS sweeps_target ON sweeps(target, id);
 `
+
+// keepSweeps bounds the history. PreviousKeys reads the newest sweep of a
+// target and nothing else, so every older row is weight without value: a
+// nightly run over 732 findings writes a quarter of a million rows a year.
+// Thirty leaves a month for anyone opening the file by hand.
+const keepSweeps = 30
 
 // Store is douane's sweep history. It exists so a sweep can report what is new
 // since the last one, which is the only reason a nightly run is bearable.
 type Store struct{ db *sql.DB }
-
-// Open creates or opens the sweep database at path.
-func Open(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := db.Exec(schema + cacheSchema); err != nil {
-		db.Close()
-		return nil, err
-	}
-	return &Store{db: db}, nil
-}
 
 // Close releases the database handle.
 func (s *Store) Close() error { return s.db.Close() }
@@ -76,7 +69,8 @@ func (s *Store) PreviousKeys(target string) (map[string]bool, error) {
 	return out, rows.Err()
 }
 
-// Save records one sweep and its findings.
+// Save records one sweep and its findings, then drops the sweeps that have
+// aged out of the window.
 func (s *Store) Save(target string, packages int, fs []finding.Finding) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -93,6 +87,16 @@ func (s *Store) Save(target string, packages int, fs []finding.Finding) error {
 	if err != nil {
 		return err
 	}
+	if err := insert(tx, sweepID, fs); err != nil {
+		return err
+	}
+	if err := prune(tx, target); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func insert(tx *sql.Tx, sweepID int64, fs []finding.Finding) error {
 	stmt, err := tx.Prepare(`INSERT INTO findings
 		(sweep_id, key, id, package, ecosystem, installed, fixed_in, severity, kev, epss)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -106,5 +110,16 @@ func (s *Store) Save(target string, packages int, fs []finding.Finding) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
+}
+
+// prune drops every sweep of target past the newest keepSweeps. Their findings
+// go with them through ON DELETE CASCADE, which is why Open asks for _fk=1:
+// SQLite leaves foreign keys off by default, and the cascade would not fire —
+// quietly, leaving orphan rows behind every delete.
+func prune(tx *sql.Tx, target string) error {
+	_, err := tx.Exec(`DELETE FROM sweeps WHERE target = ? AND id NOT IN
+		(SELECT id FROM sweeps WHERE target = ? ORDER BY id DESC LIMIT ?)`,
+		target, target, keepSweeps)
+	return err
 }

@@ -9,10 +9,9 @@ import (
 )
 
 func writeText(w io.Writer, r Report) error {
-	writeWarnings(w, r.Warnings)
+	writeNotesText(w, r.Gaps, r.Warnings)
 	if len(r.Findings) == 0 {
-		_, err := fmt.Fprintf(w, "clear — %d packages, nothing held\n", r.Packages)
-		return err
+		return writeNothingHeld(w, r)
 	}
 	for _, f := range r.Findings {
 		writeFinding(w, f, r.New[f.Key()])
@@ -21,13 +20,17 @@ func writeText(w io.Writer, r Report) error {
 	return nil
 }
 
-func writeWarnings(w io.Writer, warnings []string) {
-	for _, warn := range warnings {
-		fmt.Fprintf(w, "  ! %s\n", warn)
+// writeNothingHeld closes a scan that held nothing. It says clear only when
+// douane determined the whole answer: an incomplete scan that found nothing
+// has not established that there is nothing to find.
+func writeNothingHeld(w io.Writer, r Report) error {
+	if !r.Complete() {
+		_, err := fmt.Fprintf(w, "incomplete — %d packages, nothing held, %d unanswered\n",
+			r.Packages, len(r.Gaps))
+		return err
 	}
-	if len(warnings) > 0 {
-		fmt.Fprintln(w)
-	}
+	_, err := fmt.Fprintf(w, "clear — %d packages, nothing held\n", r.Packages)
+	return err
 }
 
 func writeFinding(w io.Writer, f finding.Finding, isNew bool) {

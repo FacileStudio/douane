@@ -10,7 +10,7 @@ import (
 
 // parseCargoLock reads the [[package]] stanzas of a Cargo.lock. Entries with no
 // source are workspace members rather than registry dependencies.
-func parseCargoLock(_ string, data []byte) ([]finding.Package, error) {
+func parseCargoLock(_ string, data []byte) ([]finding.Package, []finding.Gap, error) {
 	var pkgs []finding.Package
 	var name, version string
 	hasSource := false
@@ -37,5 +37,5 @@ func parseCargoLock(_ string, data []byte) ([]finding.Package, error) {
 		}
 	}
 	flush()
-	return pkgs, sc.Err()
+	return pkgs, nil, sc.Err()
 }

@@ -19,12 +19,12 @@ func splitNameVersion(d string) (string, string) {
 
 // parseBunLock reads bun's text lockfile. Each package entry is an array whose
 // first element is the resolved "name@version" descriptor.
-func parseBunLock(_ string, data []byte) ([]finding.Package, error) {
+func parseBunLock(_ string, data []byte) ([]finding.Package, []finding.Gap, error) {
 	var lock struct {
 		Packages map[string][]json.RawMessage `json:"packages"`
 	}
 	if err := json.Unmarshal(stripJSONC(data), &lock); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var pkgs []finding.Package
 	for _, entry := range lock.Packages {
@@ -41,5 +41,5 @@ func parseBunLock(_ string, data []byte) ([]finding.Package, error) {
 		}
 		pkgs = append(pkgs, finding.Package{Name: name, Ecosystem: "npm", Version: version})
 	}
-	return pkgs, nil
+	return pkgs, nil, nil
 }

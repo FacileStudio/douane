@@ -1,10 +1,14 @@
 package osv
 
-// Event is one point on an affected-version range: a version that introduced
-// the flaw, or one that fixed it.
+// Event is one point on an affected-version range. Only Fixed names a version
+// that is safe: LastAffected and Limit both name a version that is still
+// affected, so reading either as a fix would report an upgrade that does not
+// exist.
 type Event struct {
-	Introduced string `json:"introduced"`
-	Fixed      string `json:"fixed"`
+	Introduced   string `json:"introduced"`
+	Fixed        string `json:"fixed"`
+	LastAffected string `json:"last_affected"`
+	Limit        string `json:"limit"`
 }
 
 // Range is a contiguous span of affected versions for one package branch.

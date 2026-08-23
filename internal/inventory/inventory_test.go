@@ -47,12 +47,12 @@ func TestParseGoModIncludesIndirect(t *testing.T) {
 		"require (", "\tgithub.com/a/b v1.2.3", "\tgithub.com/c/d v0.4.0 // indirect", ")", "",
 		"require github.com/e/f v2.0.0", "",
 	}, "\n"))
-	pkgs, err := parseGoMod("go.mod", src)
+	pkgs, err := invGoMod(t, src)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(pkgs) != 3 {
-		t.Fatalf("got %d packages, want 3: %+v", len(pkgs), pkgs)
+	if n := len(invRequires(pkgs)); n != 3 {
+		t.Fatalf("got %d required packages, want 3: %+v", n, pkgs)
 	}
 	if pkgs[0].Version != "1.2.3" {
 		t.Fatalf("version = %q, want 1.2.3 (the v prefix must be stripped for OSV)", pkgs[0].Version)
@@ -70,7 +70,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 `
 
 func TestParseCargoLockSkipsWorkspaceMembers(t *testing.T) {
-	pkgs, err := parseCargoLock("Cargo.lock", []byte(cargoLock))
+	pkgs, _, err := parseCargoLock("Cargo.lock", []byte(cargoLock))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -44,10 +44,12 @@ douane scan  [path] [flags]   inspect one project
 douane sweep [dir]  [flags]   inspect every repository under a directory
 
   -format auto|text|line|json   output shape (default auto)
-  -fail   never|low|medium|high|critical|kev   exit 1 at or above (default never)
+  -fail   never|any|low|medium|high|critical|kev
+                                exit 1 at or above (default never)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
+  --version                     print the version and exit
 ```
 
 `sweep` takes the repositories directly under `dir`, resolves the **union** of their
@@ -56,9 +58,27 @@ most of their dependency tree, so a fleet of 27 repos is far closer to one scan 
 — and the feeds are fetched once, not once per repo.
 
 `-format auto` prints the human report on a terminal and the one-per-line form everywhere
-else, so pipes and agent tool calls get the parseable version without asking.
+else, so pipes and agent tool calls get the parseable version without asking. The path may
+be given before or after the flags.
 
-Exit codes: `0` clear, `1` findings at or above `-fail`, `2` bad usage or unreadable input.
+## Exit codes
+
+```
+0  clear
+1  findings at or above -fail
+2  bad usage or unreadable input
+3  scan incomplete — douane could not determine part of the answer
+```
+
+`-fail` is a claim about what was found, and douane can only make that claim over a
+complete scan. So anything it could not determine exits **3**, never 0: an OSV chunk that
+came back an error, a lockfile it cannot parse, an ecosystem it cannot read. CI can then
+tell "you are vulnerable" from "I could not tell" and retry the second before blocking on
+it.
+
+Findings still outrank incompleteness. A run that has both exits 1, because both block and
+"you are vulnerable" is the finished answer. Under `-fail never` the gaps print and appear
+in the JSON, but the exit stays 0: asking douane to just tell you is a valid request.
 
 ## How it ranks
 
@@ -76,25 +96,35 @@ from a fix you have not taken yet. douane never conflates the two.
 
 | Lockfile | Ecosystem |
 |---|---|
-| `go.mod` | Go |
+| `go.mod` | Go, and the Go standard library and toolchain from its `go` directive |
 | `package-lock.json` | npm |
 | `bun.lock` | npm |
 | `Cargo.lock` | crates.io |
 
+OSV publishes standard-library and `go` command flaws under two synthetic module names,
+`stdlib` and `toolchain`, at the release the `go` directive names. They are the largest
+source of advisories a Go repo has and they are declared nowhere else: `go 1.25.0` carries
+46 stdlib and 11 toolchain advisories on its own. Across the suite that is 1308 findings
+douane could not see at all, measured 2026-08-23.
+
 `bun.lockb` is binary and cannot be read: douane **errors** rather than silently reporting
 zero packages, because a false negative is the worst failure a scanner can have. In a sweep
-the other repositories still complete, and the run exits 2. Run
+the other repositories still complete, and the run exits 3. Run
 `bun install --save-text-lockfile` to emit `bun.lock`.
 
 ## Known limitations
 
-- **Go advisories usually carry no severity rating**, so Go findings often show `UNKNOWN`.
-  Ranking degrades gracefully, since KEV and EPSS are consulted first.
+- **Go advisories carry no severity of their own.** A `GO-*` record holds neither a rating
+  nor a CVSS vector; its GHSA twin holds both, and the alias link is the only way to reach
+  it. douane resolves severity across the whole alias closure and takes the highest score in
+  it, which costs extra requests to OSV. On 2026-08-23 that left 29 of the fleet's 1965
+  findings reading `UNKNOWN`, from 8 advisories, and each of those raises a `severity` gap
+  so it can no longer pass a threshold by being blank.
 - **No reachability analysis.** Every finding says `reachable: null`, meaning *unchecked* —
   never *unreachable*. `govulncheck` integration is the next milestone.
-- **KEV carries this fleet no signal.** Zero of 732 findings across the suite are on the
-  known-exploited list. It stays first in the ranking because one hit would matter, but do
-  not expect it to fire.
+- **KEV carries this fleet no signal.** On 2026-08-23 a sweep of 29 repos held 1965 findings
+  and not one of them was on CISA's known-exploited list. KEV stays first in the ranking
+  because a single hit would be an incident, but do not expect it to fire.
 
 See [ROADMAP.md](ROADMAP.md).
 

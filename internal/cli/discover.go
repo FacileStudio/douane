@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/inventory"
 	"github.com/FacileStudio/douane/internal/output"
 )
@@ -48,9 +49,13 @@ func isProject(dir string) bool {
 	return false
 }
 
-// inventories reads each project's lockfiles. A project that cannot be read is
-// reported and skipped — one unreadable lockfile must not cost the fleet its
-// sweep — and one holding no packages at all is not a scan target.
+// inventories reads each project's lockfiles. Every project discovered stays
+// in the report, including the ones that yielded nothing: a repository on an
+// ecosystem douane cannot parse used to vanish from the sweep entirely, which
+// reads as "clean" and is the one answer douane must never give by omission.
+// One unreadable lockfile must not cost the fleet its sweep either, so the
+// error becomes that repository's gap, which is rendered in every format, and
+// the sweep carries on.
 func inventories(dirs []string) []*repoScan {
 	var out []*repoScan
 	for _, dir := range dirs {
@@ -59,16 +64,17 @@ func inventories(dirs []string) []*repoScan {
 			Target: dir,
 			New:    map[string]bool{},
 		}}
-		pkgs, err := inventory.Scan(dir)
-		switch {
-		case err != nil:
+		pkgs, gaps, err := inventory.Scan(dir)
+		r.report.Gaps = gaps
+		if err != nil {
 			r.report.Failed = true
-			r.report.Warnings = append(r.report.Warnings, err.Error())
-		case len(pkgs) == 0:
-			continue
-		default:
-			r.pkgs, r.report.Packages = pkgs, len(pkgs)
+			r.report.Gaps = append(r.report.Gaps, finding.Gap{
+				Kind:    finding.GapUnreadable,
+				Subject: filepath.Base(dir),
+				Detail:  err.Error(),
+			})
 		}
+		r.pkgs, r.report.Packages = pkgs, len(pkgs)
 		out = append(out, r)
 	}
 	return out

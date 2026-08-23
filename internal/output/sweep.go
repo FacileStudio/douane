@@ -1,71 +1,52 @@
 package output
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 
 	"github.com/FacileStudio/douane/internal/finding"
 )
 
-// Sweep is one fleet run: every repo under a root, each already ranked.
+// Sweep is one fleet run: every repo under a root, each already ranked. As
+// with Report, json.go owns the shape this leaves in.
 type Sweep struct {
-	Root     string   `json:"root"`
-	Repos    []Report `json:"repos"`
-	Warnings []string `json:"warnings,omitempty"`
+	Root     string        `json:"root"`
+	Repos    []Report      `json:"repos"`
+	Gaps     []finding.Gap `json:"gaps,omitempty"`
+	Warnings []string      `json:"warnings,omitempty"`
 }
 
-// WriteSweep renders a fleet run in the given format.
-func WriteSweep(w io.Writer, f Format, s Sweep) error {
+// AllGaps returns every gap in the run, the fleet's own and each repo's.
+func (s Sweep) AllGaps() []finding.Gap {
+	out := append([]finding.Gap{}, s.Gaps...)
+	for _, r := range s.Repos {
+		out = append(out, r.Gaps...)
+	}
+	return out
+}
+
+// Complete reports whether the whole fleet was determined. One repository
+// douane could not read is enough to make the answer for the fleet partial.
+func (s Sweep) Complete() bool { return len(s.AllGaps()) == 0 }
+
+// WriteSweep renders a fleet run in the given format, everything on w.
+func WriteSweep(w io.Writer, f Format, s Sweep) error { return WriteSweepTo(w, w, f, s) }
+
+// WriteSweepTo renders a fleet run, data on out and notes on errw. See WriteTo
+// for why the two streams are worth separating.
+func WriteSweepTo(out, errw io.Writer, f Format, s Sweep) error {
+	if f == JSON || f == Line {
+		if err := writeSweepNotes(errw, s); err != nil {
+			return err
+		}
+	}
 	switch f {
 	case JSON:
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(s)
+		return encodeJSON(out, s)
 	case Line:
-		return writeSweepLine(w, s)
+		return writeSweepLine(out, s)
 	default:
-		return writeSweepText(w, s)
-	}
-}
-
-func writeSweepLine(w io.Writer, s Sweep) error {
-	for _, r := range s.Repos {
-		if err := writeLinePrefixed(w, r.Name+": ", r); err != nil {
-			return err
-		}
-	}
-	for _, warn := range s.Warnings {
-		if _, err := fmt.Fprintf(w, "douane: warning: %s\n", warn); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writeSweepText(w io.Writer, s Sweep) error {
-	writeWarnings(w, s.Warnings)
-	held, packages, kev := sweepTotals(s)
-	if held == 0 && !anyWarning(s) {
-		fmt.Fprintf(w, "clear — %d repos, %d packages, nothing held\n", len(s.Repos), packages)
-		return nil
-	}
-	for _, r := range s.Repos {
-		if len(r.Findings) == 0 && len(r.Warnings) == 0 {
-			continue
-		}
-		writeRepo(w, r)
-	}
-	writeSweepSummary(w, s, held, packages, kev)
-	return nil
-}
-
-func writeRepo(w io.Writer, r Report) {
-	fmt.Fprintf(w, "%s — %d held out of %d packages\n\n", r.Name, len(r.Findings), r.Packages)
-	writeWarnings(w, r.Warnings)
-	for _, f := range r.Findings {
-		writeFinding(w, f, r.New[f.Key()])
+		return writeSweepText(out, s)
 	}
 }
 
