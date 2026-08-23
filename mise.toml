@@ -14,7 +14,10 @@ run = "go build -o douane ."
 [tasks.test]
 run = "go test ./..."
 
+# check is the gate: style, architecture and complexity from filet, then the
+# tests. One command, so nothing that must pass can be forgotten.
 [tasks.check]
+depends = ["test"]
 run = "filet check"
 
 [tasks.install]

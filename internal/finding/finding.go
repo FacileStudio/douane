@@ -1,7 +1,5 @@
 package finding
 
-import "sort"
-
 // Severity is the coarse impact rating carried by an advisory.
 type Severity int
 
@@ -91,27 +89,4 @@ func (f Finding) HasFix() bool { return f.FixedIn != "" }
 // Key identifies a finding uniquely within one sweep.
 func (f Finding) Key() string {
 	return f.Ecosystem + "|" + f.Package + "|" + f.Installed + "|" + f.ID
-}
-
-// Rank sorts findings by what should be acted on first: known-exploited,
-// then likelihood of exploitation, then severity, then a stable tiebreak.
-func Rank(fs []Finding) {
-	sort.SliceStable(fs, func(i, j int) bool { return Less(fs[i], fs[j]) })
-}
-
-// Less reports whether a should be acted on before b. It is what Rank sorts
-// by, exported so a fleet report can order repos by their worst finding
-// without a second, quietly different, notion of "worst".
-func Less(a, b Finding) bool {
-	switch {
-	case a.Exploit.KEV != b.Exploit.KEV:
-		return a.Exploit.KEV
-	case a.Exploit.EPSS != b.Exploit.EPSS:
-		return a.Exploit.EPSS > b.Exploit.EPSS
-	case a.Severity != b.Severity:
-		return a.Severity > b.Severity
-	case a.Package != b.Package:
-		return a.Package < b.Package
-	}
-	return a.ID < b.ID
 }

@@ -18,7 +18,9 @@ filet, is unforgiving:
 
 > A sweep over a healthy suite prints **zero lines**.
 
-We are 732 lines away from it. That gap is the roadmap.
+We are **1965 lines** away from it, measured 2026-08-23 over 29 repos. That gap is the roadmap,
+and v1.5 widened it on purpose: 656 of those lines were visible before, and the other 1308 are
+the Go standard library and toolchain, which douane had never queried. npm is unchanged at 544.
 
 ---
 
@@ -77,11 +79,13 @@ Evidence, not milestone numbers, sets this. Current order:
 
 1. ~~**v1.2** feed caching~~ — shipped 2026-08-19
 2. ~~**v1.3** `douane sweep`~~ — shipped 2026-08-19
-3. **v1.4** report by fix — the cheapest 3.4× noise cut on the board
-4. **v2.1** govulncheck reachability — kills most of the 109 Go findings
-5. **v3** deployed-or-not — promoted; now the sharpest axis available
-6. **v1.1** permits — demoted; needed once the volume is survivable
-7. **v4** Dependabot, **v5** automation
+3. ~~**v1.5** gaps and the incomplete-scan contract~~, shipped 2026-08-23
+4. ~~**v2.2** severity from the alias closure~~, shipped 2026-08-23
+5. **v1.4** report by fix. The cheapest noise cut on the board, and 1965 findings need it
+6. **v2.1** govulncheck reachability, now the axis over 1420 Go findings rather than 109
+7. **v3** deployed-or-not, promoted. Now the sharpest axis available
+8. **v1.1** permits, demoted. Needed once the volume is survivable
+9. **v4** Dependabot, **v5** automation
 
 ---
 
@@ -100,7 +104,7 @@ whole; EPSS is queried per CVE, so it is cached per CVE and only the missing one
 **Note.** There is no `feed_cache` table today — earlier drafts of this file claimed there was.
 `internal/store/store.go` holds `sweeps` and `findings` only. Both cache tables are new.
 
-**Exit criterion — met.** Second run within the TTL makes zero requests to KEV or EPSS
+**Exit criterion, met.** Second run within the TTL makes zero requests to KEV or EPSS
 (`feed_cache.fetched` is unchanged; `-refresh` moves it). With the network down and a warm
 cache, ranking is still fully populated and one warning names the cache age. A KEV payload
 with zero entries is refused rather than cached.
@@ -117,11 +121,40 @@ inventory, **unions the packages and resolves once** — Glure and Glouton alone
 packages, and 732 findings across the suite are 230 advisories — then splits the results back
 per repo. Grouped by repo, ranked globally, same history diff, one summary row per repo.
 
-**Exit criterion — met.** `douane sweep ~/Code/Facile` completes in **13s** warm (the shell
+**Exit criterion, met.** `douane sweep ~/Code/Facile` completes in **13s** warm (the shell
 loop it replaces took ~2min) and reproduces the v0.1 total of 732 findings across 27 repos.
 A second run reports zero `[NEW]`.
 
 **Depends on.** v1.2 — without caching this is 27 KEV downloads.
+
+### v1.5 Gaps and the incomplete-scan contract, shipped 2026-08-23
+
+**Why.** douane had no way to say "I could not determine this", so every path where the scan
+came up short rendered as a clean exit. Eight were proven against the live API: OSV's error
+envelope decoding to zero results, a batch response shorter than the request, a failed detail
+fetch dropping its finding, a repo with no recognised lockfile vanishing from the sweep, a path
+after the flags being ignored so douane scanned `$PWD`, `SevUnknown` sitting below every `-fail`
+threshold, `next_page_token` ignored, and the `go` directive discarded so no Go repo was ever
+checked against the standard library it ships.
+
+**What.** One structured record, `finding.Gap`, replacing three incoherent ways of saying
+something went wrong: a warning string with no effect on the exit code, a `Failed` bool set in
+exactly one place, and findings simply being absent. Six kinds, each carrying its subject and
+what happened: `upstream`, `unreadable`, `unsupported`, `unresolved`, `severity`, `range`.
+Exit code **3** for a scan carrying any gap under a `-fail` other than `never`, so CI can tell
+"you are vulnerable" from "I could not tell". Plus `-fail any`, `--version`, `stdlib` and
+`toolchain` from the `go` directive, one HTTP client with status checks and bounded retry behind
+all three feeds, and the sqlite DSN that stops concurrent sweeps going busy.
+
+**Exit criterion, met.** A scan of a directory whose only lockfile is `pnpm-lock.yaml` exits 3
+under `-fail low` and 0 under `-fail never`, reporting an `unsupported` gap either way. A sweep
+whose only repo carries a `bun.lockb` still lists that repo and exits 3. A run holding both
+findings above the threshold and a gap exits 1. `douane scan .` on this repo reports the 46
+`stdlib` and 11 `toolchain` advisories of `go 1.25.0`, where the previous binary reported none.
+The suite sweep reports 29 repos including `hooks`, which declares no dependencies at all and
+used to vanish. `douane --version` prints one line.
+
+**Depends on.** Nothing.
 
 ### v1.4 Report by fix, not by finding
 
@@ -175,17 +208,29 @@ surviving Go finding reports `reachable: true`.
 
 **Depends on.** Nothing. Needs `govulncheck` installed on ruche, which currently has no Go.
 
-### v2.2 Severity for Go advisories
+### v2.2 Severity for Go advisories, shipped 2026-08-23
 
-**Why.** `GO-*` records omit `database_specific.severity`, so 43 findings read `UNKNOWN` — all of
-them Go. With KEV silent and EPSS thin, severity is doing more ranking work than the original
-design assumed, and it is blank exactly where the fleet's own code lives.
+**Why.** `GO-*` records omit `database_specific.severity`, so 46 findings read `UNKNOWN` on
+2026-08-23, all of them Go. With KEV silent and EPSS thin, severity is doing more ranking work
+than the original design assumed, and it is blank exactly where the fleet's own code lives.
 
-**What.** Compute the CVSS v3 base score from the vector already present in `severity[]` and map
-it to a band. This is the published formula, not a heuristic.
+**The premise this milestone rested on was false.** It said "compute the CVSS v3 base score from
+the vector already present in `severity[]`". The vector is not present. Measured 2026-08-23:
+0 of the 46 UNKNOWN findings carry one, and `GO-2026-5932` answers with `severity: None` and a
+`database_specific` block holding a URL and a review status, nothing else.
 
-**Exit criterion.** A tronc scan reports a real severity for every finding carrying a CVSS
-vector, and a unit test pins three known vectors to their published scores.
+**What.** The rating lives on the advisory's GHSA twin and is reachable only through the alias
+link, because the CVE record that carries the vector often has an empty `affected[]` and no
+package query can return it. So: build the alias closure from the records OSV returned, fetch the
+members not already held, and take the highest CVSS across the closure. Not first-wins:
+`CVE-2025-22870` has `severity: null` while its GHSA sibling carries the vector. osv-scanner does
+the same and never reads `database_specific.severity` at all.
+
+**Exit criterion, met.** A fleet sweep on 2026-08-23 holds 29 UNKNOWN findings, down from 46,
+and the finding count tripled in the same pass. The residue is 8 `GO-*` advisories, each raising
+a `severity` gap that names itself, so none of them can pass a threshold by being blank. A scan
+of this repo reports 29 HIGH, 24 MEDIUM, 3 CRITICAL and 1 LOW where all 57 of its findings
+previously read UNKNOWN.
 
 **Depends on.** Nothing.
 

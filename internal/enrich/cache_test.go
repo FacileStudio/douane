@@ -11,8 +11,8 @@ import (
 	"github.com/FacileStudio/douane/internal/finding"
 )
 
-const kevBody = `{"vulnerabilities":[{"cveID":"CVE-2026-1","knownRansomwareCampaignUse":"Known"}]}`
-const epssBody = `{"data":[{"cve":"CVE-2026-1","epss":"0.5"}]}`
+const kevBody = `{"vulnerabilities":[{"cveID":"CVE-2026-0001","knownRansomwareCampaignUse":"Known"}]}`
+const epssBody = `{"data":[{"cve":"CVE-2026-0001","epss":"0.5"}]}`
 
 type fakeCache struct {
 	feed   map[string][]byte
@@ -80,14 +80,14 @@ func testEnricher(t *testing.T, c Cache, hits *counters, status int) *Enricher {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	e := New().WithCache(c)
-	e.kevURL, e.epssURL = srv.URL+"/kev", srv.URL+"/epss"
+	e.http, e.kevURL, e.epssURL = enrFastClient(), srv.URL+"/kev", srv.URL+"/epss"
 	return e
 }
 
 func fixtures() []finding.Finding {
 	return []finding.Finding{
-		{ID: "CVE-2026-1", Package: "a"},
-		{ID: "CVE-2026-2", Package: "b"},
+		{ID: "CVE-2026-0001", Package: "a"},
+		{ID: "CVE-2026-0002", Package: "b"},
 	}
 }
 
@@ -111,13 +111,13 @@ func TestSecondRunTouchesNoFeed(t *testing.T) {
 		t.Fatalf("second run degraded: %+v", res)
 	}
 	if !second[0].Exploit.KEV || !second[0].Exploit.Ransomware {
-		t.Fatal("cached KEV catalogue did not flag CVE-2026-1")
+		t.Fatal("cached KEV catalogue did not flag CVE-2026-0001")
 	}
 	if second[0].Exploit.EPSS != 0.5 || !second[0].Exploit.EPSSKnown {
 		t.Fatalf("cached EPSS score = %v, want 0.5", second[0].Exploit.EPSS)
 	}
 	if second[1].Exploit.EPSSKnown {
-		t.Fatal("CVE-2026-2 has no EPSS score and must not read as known")
+		t.Fatal("CVE-2026-0002 has no EPSS score and must not read as known")
 	}
 }
 
@@ -126,7 +126,7 @@ func TestUnscoredCVEIsNotRequeried(t *testing.T) {
 	e := testEnricher(t, cache, hits, http.StatusOK)
 	e.Apply(context.Background(), fixtures())
 
-	if got := cache.epss["CVE-2026-2"]; got != scoreUnknown {
+	if got := cache.epss["CVE-2026-0002"]; got != scoreUnknown {
 		t.Fatalf("cached score for an unscored CVE = %v, want %v", got, scoreUnknown)
 	}
 	e.Apply(context.Background(), fixtures())
@@ -139,8 +139,8 @@ func TestStaleCacheSurvivesADeadFeed(t *testing.T) {
 	cache, hits := newFakeCache(), &counters{}
 	cache.feed[kevFeed] = []byte(kevBody)
 	cache.feedAt[kevFeed] = time.Now().Add(-48 * time.Hour)
-	cache.epss["CVE-2026-1"] = 0.5
-	cache.epssAt["CVE-2026-1"] = time.Now()
+	cache.epss["CVE-2026-0001"] = 0.5
+	cache.epssAt["CVE-2026-0001"] = time.Now()
 
 	e := testEnricher(t, cache, hits, http.StatusInternalServerError)
 	fs := fixtures()
@@ -167,8 +167,8 @@ func TestRefreshStillFallsBackToTheCache(t *testing.T) {
 	cache, hits := newFakeCache(), &counters{}
 	cache.feed[kevFeed] = []byte(kevBody)
 	cache.feedAt[kevFeed] = time.Now()
-	cache.epss["CVE-2026-1"] = 0.5
-	cache.epssAt["CVE-2026-1"] = time.Now()
+	cache.epss["CVE-2026-0001"] = 0.5
+	cache.epssAt["CVE-2026-0001"] = time.Now()
 
 	e := testEnricher(t, cache, hits, http.StatusInternalServerError).WithRefresh(true)
 	fs := fixtures()

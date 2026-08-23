@@ -10,21 +10,31 @@ import (
 
 // parseGoMod reads the require directives of a go.mod, in both the block and
 // the single-line form. Indirect dependencies are included: they ship in the
-// binary exactly like direct ones.
-func parseGoMod(_ string, data []byte) ([]finding.Package, error) {
+// binary exactly like direct ones. The go and toolchain directives are read
+// too, because the standard library ships in the binary as well.
+func parseGoMod(_ string, data []byte) ([]finding.Package, []finding.Gap, error) {
 	var pkgs []finding.Package
+	var directives goDirectives
 	inBlock := false
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
-		line, keep := requireLine(strip(sc.Text()), &inBlock)
+		line := strip(sc.Text())
+		if !inBlock {
+			directives.read(line)
+		}
+		req, keep := requireLine(line, &inBlock)
 		if !keep {
 			continue
 		}
-		if pkg, ok := requirement(line); ok {
+		if pkg, ok := requirement(req); ok {
 			pkgs = append(pkgs, pkg)
 		}
 	}
-	return pkgs, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, nil, err
+	}
+	release, gaps := directives.packages()
+	return append(pkgs, release...), gaps, nil
 }
 
 func strip(line string) string {

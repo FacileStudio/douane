@@ -5,13 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 )
-
-const feedSizeLimit = 32 << 20
 
 // kevCatalog resolves the known-exploited catalogue, preferring a fresh cache,
 // then the network, then a cache past its TTL. Only the last case is reported
@@ -24,8 +20,10 @@ func (e *Enricher) kevCatalog(ctx context.Context, res *Result) (map[string]bool
 			return catalog, nil
 		}
 	}
-	raw, err := e.fetchKEV(ctx)
-	if err == nil {
+	raw, err := e.http.Bytes(ctx, e.kevURL)
+	if err != nil {
+		err = fmt.Errorf("kev: %w", err)
+	} else {
 		catalog, derr := decodeKEV(raw)
 		if derr == nil {
 			res.CacheErr = e.saveKEV(raw)
@@ -67,22 +65,6 @@ func (e *Enricher) saveKEV(payload []byte) error {
 	return e.cache.SaveFeed(kevFeed, payload)
 }
 
-func (e *Enricher) fetchKEV(ctx context.Context) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, e.kevURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := e.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("kev: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("kev: status %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, feedSizeLimit))
-}
-
 // decodeKEV parses the catalogue and refuses an empty one. An empty catalogue
 // is indistinguishable from "nothing is exploited", which would silence the
 // top prioritiser for a whole TTL if it were ever cached.
@@ -104,12 +86,4 @@ func decodeKEV(payload []byte) (map[string]bool, error) {
 		out[v.CveID] = strings.EqualFold(v.KnownRansomwareCampaignUse, "Known")
 	}
 	return out, nil
-}
-
-func keys(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
 }

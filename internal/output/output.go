@@ -1,7 +1,6 @@
 package output
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -34,7 +33,9 @@ func Resolve(f Format, w *os.File) Format {
 	return Text
 }
 
-// Report is one sweep's result, ready to render.
+// Report is one sweep's result, ready to render. The json tags below are the
+// field names; the document a consumer actually receives is assembled in
+// json.go, which adds what a struct tag cannot say.
 type Report struct {
 	Name     string            `json:"name,omitempty"`
 	Target   string            `json:"target"`
@@ -42,25 +43,38 @@ type Report struct {
 	Failed   bool              `json:"failed,omitempty"`
 	Findings []finding.Finding `json:"findings"`
 	New      map[string]bool   `json:"-"`
+	Gaps     []finding.Gap     `json:"gaps,omitempty"`
 	Warnings []string          `json:"warnings,omitempty"`
 }
 
-// Write renders the report in the given format.
-func Write(w io.Writer, f Format, r Report) error {
+// Complete reports whether douane determined everything it set out to. An
+// incomplete report may be missing findings it never got to see, so a -fail
+// threshold cannot be honoured over it.
+func (r Report) Complete() bool { return len(r.Gaps) == 0 }
+
+// Write renders the report in the given format, everything on w. WriteTo is
+// the form that keeps a parser's stream clean.
+func Write(w io.Writer, f Format, r Report) error { return WriteTo(w, w, f, r) }
+
+// WriteTo renders the report, sending the data to out and the notes — gaps and
+// warnings — to errw. In line and json form that separation is the whole
+// point: what stdout carries is then findings and nothing else, and a warning
+// can no longer be mistaken for one by whatever is grepping the stream. Text
+// is a single narrative for a human, so it stays on one writer.
+func WriteTo(out, errw io.Writer, f Format, r Report) error {
+	if f == JSON || f == Line {
+		if err := writeNotes(errw, "", r.Gaps, r.Warnings); err != nil {
+			return err
+		}
+	}
 	switch f {
 	case JSON:
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(r)
+		return encodeJSON(out, r)
 	case Line:
-		return writeLine(w, r)
+		return writeLinePrefixed(out, "", r)
 	default:
-		return writeText(w, r)
+		return writeText(out, r)
 	}
-}
-
-func writeLine(w io.Writer, r Report) error {
-	return writeLinePrefixed(w, "", r)
 }
 
 // writeLinePrefixed renders the greppable form, tagging every line with prefix
@@ -74,11 +88,6 @@ func writeLinePrefixed(w io.Writer, prefix string, r Report) error {
 		if _, err := fmt.Fprintf(w, "%s%s:%s@%s: %s: %s [%s epss=%.4f kev=%t fix=%s]\n",
 			prefix, f.Ecosystem, f.Package, f.Installed, strings.ToLower(f.Severity.String()),
 			f.ID, f.Target, f.Exploit.EPSS, f.Exploit.KEV, fix); err != nil {
-			return err
-		}
-	}
-	for _, warn := range r.Warnings {
-		if _, err := fmt.Fprintf(w, "douane: warning: %s%s\n", prefix, warn); err != nil {
 			return err
 		}
 	}

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -8,6 +9,26 @@ import (
 	"github.com/FacileStudio/douane/internal/output"
 	"github.com/FacileStudio/douane/internal/store"
 )
+
+// Process exit codes. 3 exists so that CI can tell "you are vulnerable", which
+// is final, from "douane could not determine part of the answer", which is
+// worth retrying before it blocks.
+const (
+	exitClear      = 0
+	exitFindings   = 1
+	exitUsage      = 2
+	exitIncomplete = 3
+)
+
+// threshold is what -fail was set to. It is a type rather than a magic int
+// because "fail on anything" and "fail only on KEV" are not points on the
+// severity scale and pretending otherwise is how they got compared with <.
+type threshold struct {
+	severity finding.Severity
+	kev      bool
+	any      bool
+	never    bool
+}
 
 // history marks findings unseen by the previous sweep of this target and
 // records the current one. The store is passed in already open: a fleet sweep
@@ -26,6 +47,19 @@ func history(st *store.Store, report *output.Report) error {
 	return st.Save(report.Target, report.Packages, report.Findings)
 }
 
+// record files this run so the next one can say what is new. A history that
+// cannot be written costs the NEW badge, never the scan, so it degrades to a
+// warning rather than an exit code.
+func record(st *store.Store, report *output.Report) {
+	if st == nil {
+		return
+	}
+	if err := history(st, report); err != nil {
+		report.Warnings = append(report.Warnings,
+			fmt.Sprintf("sweep history unavailable: %v", err))
+	}
+}
+
 func defaultDB() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -34,32 +68,52 @@ func defaultDB() string {
 	return filepath.Join(home, ".douane.db")
 }
 
-func parseFail(s string) (int, bool) {
+func parseFail(s string) (threshold, bool) {
 	switch s {
 	case "never":
-		return 99, true
+		return threshold{never: true}, true
+	case "any":
+		return threshold{any: true}, true
 	case "kev":
-		return 98, true
+		return threshold{kev: true}, true
 	case "low":
-		return int(finding.SevLow), true
+		return threshold{severity: finding.SevLow}, true
 	case "medium":
-		return int(finding.SevMedium), true
+		return threshold{severity: finding.SevMedium}, true
 	case "high":
-		return int(finding.SevHigh), true
+		return threshold{severity: finding.SevHigh}, true
 	case "critical":
-		return int(finding.SevCritical), true
+		return threshold{severity: finding.SevCritical}, true
 	}
-	return 0, false
+	return threshold{}, false
 }
 
-func shouldFail(fs []finding.Finding, threshold int) bool {
+func shouldFail(fs []finding.Finding, t threshold) bool {
+	if t.never {
+		return false
+	}
 	for _, f := range fs {
-		if threshold == 98 && f.Exploit.KEV {
+		switch {
+		case t.any:
 			return true
-		}
-		if threshold < 98 && int(f.Severity) >= threshold {
+		case t.kev && f.Exploit.KEV:
+			return true
+		case !t.kev && f.Severity >= t.severity:
 			return true
 		}
 	}
 	return false
+}
+
+// exitFor ranks the two ways a run can be bad. Findings above the threshold
+// outrank an incomplete scan: both block, but "you are vulnerable" is a
+// finished answer and there is nothing to retry.
+func exitFor(fs []finding.Finding, gaps []finding.Gap, t threshold) int {
+	if shouldFail(fs, t) {
+		return exitFindings
+	}
+	if !t.never && len(gaps) > 0 {
+		return exitIncomplete
+	}
+	return exitClear
 }

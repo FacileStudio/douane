@@ -2,19 +2,20 @@ package enrich
 
 import (
 	"context"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/httpx"
+	"github.com/FacileStudio/douane/internal/version"
 )
 
 const (
-	kevURL      = "https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json"
-	epssURL     = "https://api.first.org/data/v1/epss"
-	epssPerCall = 100
-	kevFeed     = "kev"
-	feedTTL     = 24 * time.Hour
+	kevURL        = "https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json"
+	epssURL       = "https://api.first.org/data/v1/epss"
+	kevFeed       = "kev"
+	epssFeed      = "epss"
+	feedTTL       = 24 * time.Hour
+	feedSizeLimit = 32 << 20
 )
 
 // scoreUnknown records that EPSS was asked about a CVE and had no score for it.
@@ -34,7 +35,8 @@ type Cache interface {
 
 // Result reports which feeds answered. A feed being unreachable degrades the
 // ranking, it never fails the sweep — but the caller must be able to say so,
-// including when the answer came from a cache that is past its TTL.
+// including when the answer came from a cache that is past its TTL, which is
+// what Gaps carries into the exit code.
 type Result struct {
 	KEVOK     bool
 	EPSSOK    bool
@@ -44,11 +46,12 @@ type Result struct {
 	KEVStale  bool
 	EPSSStale bool
 	CacheErr  error
+	Gaps      []finding.Gap
 }
 
 // Enricher annotates findings with real-world exploitation signals.
 type Enricher struct {
-	http    *http.Client
+	http    *httpx.Client
 	kevURL  string
 	epssURL string
 	cache   Cache
@@ -58,7 +61,7 @@ type Enricher struct {
 // New returns an Enricher pointed at the public KEV and EPSS feeds.
 func New() *Enricher {
 	return &Enricher{
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    httpx.New(version.UserAgent()).WithMaxBody(feedSizeLimit),
 		kevURL:  kevURL,
 		epssURL: epssURL,
 	}
@@ -78,7 +81,10 @@ func (e *Enricher) WithRefresh(v bool) *Enricher {
 	return e
 }
 
-// Apply fills the exploitation signals of every finding in place.
+// Apply fills the exploitation signals of every finding in place. Neither feed
+// aborts the other, and whatever either one could not answer leaves a gap
+// behind: a KEV catalogue that never arrived must not read as "nothing here is
+// exploited", which is what -fail kev was measuring before.
 func (e *Enricher) Apply(ctx context.Context, fs []finding.Finding) Result {
 	var res Result
 	kev, err := e.kevCatalog(ctx, &res)
@@ -89,13 +95,15 @@ func (e *Enricher) Apply(ctx context.Context, fs []finding.Finding) Result {
 		applyKEV(fs, kev)
 	}
 
-	scores, err := e.epssScores(ctx, cveIDs(fs), &res)
+	cves, malformed := epssIDs(fs)
+	scores, err := e.epssScores(ctx, cves, &res)
 	if err != nil {
 		res.EPSSErr = err
-		return res
+	} else {
+		res.EPSSOK = true
+		applyEPSS(fs, scores)
 	}
-	res.EPSSOK = true
-	applyEPSS(fs, scores)
+	res.Gaps = enrGaps(&res, malformed)
 	return res
 }
 
@@ -129,16 +137,4 @@ func applyEPSS(fs []finding.Finding, scores map[string]float64) {
 			break
 		}
 	}
-}
-
-func cveIDs(fs []finding.Finding) []string {
-	set := map[string]bool{}
-	for _, f := range fs {
-		for _, id := range identifiers(f) {
-			if strings.HasPrefix(id, "CVE-") {
-				set[id] = true
-			}
-		}
-	}
-	return keys(set)
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,8 +49,8 @@ func TestSharedResolutionKeepsEveryRepoFindings(t *testing.T) {
 	}
 	vulns := map[string]osv.Vuln{"CVE-2026-1": {ID: "CVE-2026-1", Summary: "boom"}}
 
-	fa := buildFrom(a.pkgs, ids, vulns)
-	fb := buildFrom(b.pkgs, ids, vulns)
+	fa, _ := buildFrom(a.pkgs, ids, vulns)
+	fb, _ := buildFrom(b.pkgs, ids, vulns)
 	if len(fa) != 1 || len(fb) != 1 {
 		t.Fatalf("findings = %d and %d, want one each — a shared package must be reported in both repos", len(fa), len(fb))
 	}
@@ -58,14 +59,39 @@ func TestSharedResolutionKeepsEveryRepoFindings(t *testing.T) {
 	}
 }
 
-func TestInventoriesSkipsProjectsWithoutPackages(t *testing.T) {
+func TestInventoriesKeepsProjectsWithoutPackages(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "empty", ".git", "HEAD"), "ref: refs/heads/main")
 	write(t, filepath.Join(root, "real", "go.mod"), "module example.com/x\n\nrequire golang.org/x/crypto v0.31.0\n")
 
 	repos := inventories([]string{filepath.Join(root, "empty"), filepath.Join(root, "real")})
-	if len(repos) != 1 || repos[0].report.Name != "real" {
-		t.Fatalf("inventories kept %d repos, want only the one declaring packages", len(repos))
+	if len(repos) != 2 {
+		t.Fatalf("inventories kept %d repos, want 2 — a repo douane cannot read must still be reported", len(repos))
+	}
+	if repos[0].report.Name != "empty" || repos[0].report.Packages != 0 {
+		t.Fatalf("repo 0 = %q with %d packages, want empty with 0",
+			repos[0].report.Name, repos[0].report.Packages)
+	}
+	if repos[1].report.Packages == 0 {
+		t.Fatal("the repo declaring packages reported none")
+	}
+}
+
+func TestSweepCarriesEveryRepoGap(t *testing.T) {
+	r := &repoScan{report: output.Report{Name: "unsupported", New: map[string]bool{}}}
+	r.report.Gaps = []finding.Gap{{
+		Kind:    finding.GapUnsupported,
+		Subject: "unsupported",
+		Detail:  "composer.lock is not an ecosystem douane reads",
+	}}
+	var sweep output.Sweep
+	collect([]*repoScan{r}, nil, &sweep)
+
+	if got := sweep.AllGaps(); len(got) != 1 || got[0].Kind != finding.GapUnsupported {
+		t.Fatalf("AllGaps = %v, want the repo gap — a gap that never reaches the sweep cannot set the exit code", got)
+	}
+	if code := sweepExit(sweep, threshold{severity: finding.SevHigh}); code != exitIncomplete {
+		t.Fatalf("sweepExit = %d, want %d", code, exitIncomplete)
 	}
 }
 
@@ -89,5 +115,22 @@ func write(t *testing.T, path, body string) {
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestScanOneCallsAnEmptyTargetAGap(t *testing.T) {
+	report, code := scanOne(context.Background(), options{path: t.TempDir()}, nil)
+	if code != exitClear {
+		t.Fatalf("code = %d, want %d", code, exitClear)
+	}
+	if len(report.Gaps) != 1 || report.Gaps[0].Kind != finding.GapUnsupported {
+		t.Fatalf("gaps = %v, want one unsupported gap: finding nothing to scan is not the same as finding nothing wrong",
+			report.Gaps)
+	}
+	if got := exitFor(report.Findings, report.Gaps, threshold{severity: finding.SevHigh}); got != exitIncomplete {
+		t.Fatalf("exitFor = %d, want %d — the wrong directory must not report clean", got, exitIncomplete)
+	}
+	if got := exitFor(report.Findings, report.Gaps, threshold{never: true}); got != exitClear {
+		t.Fatalf("exitFor under -fail never = %d, want %d", got, exitClear)
 	}
 }
