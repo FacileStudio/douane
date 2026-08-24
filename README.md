@@ -30,12 +30,22 @@ ago and have since been found dangerous. That is exactly the job.
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/FacileStudio/douane/main/install.sh | bash
+```
+
+That is a shim for `facile install douane`, the suite installer. On macOS,
+Homebrew works too once the tap is populated:
+
+```sh
+brew install --cask facilestudio/tap/douane
+```
+
+From source, if you already have the checkout:
+
+```sh
 git clone git@github.com:FacileStudio/douane.git && cd douane
 mise run install          # GOBIN=$HOME/go/bin go install .
 ```
-
-The repo is private, so `go install github.com/FacileStudio/douane@latest` needs
-`GOPRIVATE=github.com/FacileStudio` and a working SSH remote. Cloning is simpler.
 
 ## Usage
 

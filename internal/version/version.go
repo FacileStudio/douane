@@ -1,6 +1,7 @@
-// Package version reports the build's own version. It reads the stamp the
-// toolchain records rather than a literal in the source, because a literal
-// drifts on the first release nobody remembers to bump it for.
+// Package version reports the build's own version. Release builds get the tag
+// via -ldflags; everything else falls back to the stamp the toolchain records,
+// because a literal in the source drifts on the first release nobody remembers
+// to bump it for.
 package version
 
 import "runtime/debug"
@@ -12,10 +13,19 @@ const site = "https://github.com/FacileStudio/douane"
 // land here: they record no VCS settings and call the main module "(devel)".
 const unknown = "dev"
 
-// String returns the version of this build: the module's tag when it was built
-// from one, otherwise the commit it came from, marked +dirty if the tree had
-// uncommitted changes.
+// stamp is injected by release builds (-X .../internal/version.stamp=vX.Y.Z).
+// A binary built outside the module proxy records no tag in its build info,
+// so without this a goreleaser artifact would report its commit hash where
+// every other suite CLI reports its release.
+var stamp = ""
+
+// String returns the version of this build: the release stamp when one was
+// linked in, else the module's tag, else the commit it came from, marked
+// +dirty if the tree had uncommitted changes.
 func String() string {
+	if stamp != "" {
+		return stamp
+	}
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
 		return unknown
