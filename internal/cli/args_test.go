@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/FacileStudio/douane/internal/finding"
@@ -63,6 +64,41 @@ func TestParseArgsDefaultsToGroupedByFix(t *testing.T) {
 	}
 	if _, code := parseArgs("scan", []string{"-by", "finding", "/target"}); code != exitClear {
 		t.Fatalf("code = %d, want %d — the flat view must stay reachable", code, exitClear)
+	}
+}
+
+// TestDiscoverIncludesAProjectRoot closes the single-repo blind spot:
+// `douane sweep ~/checkouts/douane` must sweep douane, not report an empty
+// fleet for a directory that is itself a checkout.
+func TestDiscoverIncludesAProjectRoot(t *testing.T) {
+	repo := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dirs, err := discover(repo)
+	if err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	if len(dirs) != 1 || dirs[0] != filepath.Clean(repo) {
+		t.Fatalf("discover(%s) = %v, want the repo itself", repo, dirs)
+	}
+}
+
+func TestDiscoverStillPrefersChildrenOfAFleetRoot(t *testing.T) {
+	fleet := t.TempDir()
+	repo := filepath.Join(fleet, "someapp")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "bun.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dirs, err := discover(fleet)
+	if err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	if len(dirs) != 1 || filepath.Base(dirs[0]) != "someapp" {
+		t.Fatalf("discover = %v, want the child project", dirs)
 	}
 }
 

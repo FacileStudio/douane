@@ -50,22 +50,39 @@ func Groups(fs []Finding, isNew func(Finding) bool) []Group {
 		}
 		g.absorb(f, isNew)
 	}
-	out := make([]Group, 0, len(byKey))
+	out := make([]Group, 0, len(keys))
 	for _, k := range keys {
-		g := byKey[k]
-		sort.Strings(g.IDs)
-		sort.Strings(g.Targets)
-		sort.Strings(g.Installed)
-		out = append(out, *g)
+		out = append(out, byKey[k].finalized())
 	}
-	stable := sort.SliceStable
-	stable(out, func(i, j int) bool {
-		if Less(out[i].worst, out[j].worst) || Less(out[j].worst, out[i].worst) {
-			return Less(out[i].worst, out[j].worst)
-		}
-		return fixKey(out[i].worst) < fixKey(out[j].worst)
-	})
+	orderGroups(out)
 	return out
+}
+
+// finalized sorts the group's member lists — ids lexically, installed
+// versions numerically so 4.11.0 does not precede 4.9.0 — and returns the
+// value copy that reaches callers and json.
+func (g *Group) finalized() Group {
+	sort.Strings(g.IDs)
+	sort.Strings(g.Targets)
+	sort.Slice(g.Installed, func(i, j int) bool {
+		return lessVersion(g.Installed[i], g.Installed[j])
+	})
+	return *g
+}
+
+// orderGroups puts worst actions first under the rank ordering, ties broken by
+// fix key so equal-rank groups land in a stable, reproducible order.
+func orderGroups(out []Group) {
+	sort.SliceStable(out, func(i, j int) bool {
+		switch {
+		case Less(out[i].worst, out[j].worst):
+			return true
+		case Less(out[j].worst, out[i].worst):
+			return false
+		default:
+			return fixKey(out[i].worst) < fixKey(out[j].worst)
+		}
+	})
 }
 
 // absorb folds one finding into its group, tracking count, novelty, the KEV

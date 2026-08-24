@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/FacileStudio/douane/internal/finding"
@@ -74,5 +75,18 @@ func TestGroupsCountNewThroughThePredicate(t *testing.T) {
 	})
 	if gs[0].New != 1 {
 		t.Fatalf("new = %d, want only the unseen finding counted", gs[0].New)
+	}
+}
+
+// TestGroupsOrderVersionsNumerically guards the display order: lexical sort
+// puts 4.11.0 before 4.9.0, which reads as a downgrade.
+func TestGroupsOrderVersionsNumerically(t *testing.T) {
+	gs := finding.Groups([]finding.Finding{
+		grpFinding("GO-1", "4.11.0", false),
+		grpFinding("GO-2", "4.9.0", false),
+	}, nil)
+	want := "4.9.0, 4.11.0"
+	if got := strings.Join(gs[0].Installed, ", "); got != want {
+		t.Fatalf("installed = %q, want %q — versions must sort numerically", got, want)
 	}
 }

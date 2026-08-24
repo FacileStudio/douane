@@ -23,10 +23,10 @@ func sweepFixLines(w io.Writer, s Sweep) error {
 		}
 		worst := g.WorstFinding()
 		if _, err := fmt.Fprintf(w,
-			"%s:%s@%s: %d finding%s in %d target%s: %s: worst=%s [epss=%.4f kev=%t fix=%s]\n",
+			"%s:%s@%s: %d finding%s in %d target%s: %s: worst=%s [epss=%.4f kev=%t fix=%s targets=%s]\n",
 			g.Ecosystem, g.Package, fix, g.Count, plural(g.Count), len(g.Targets),
 			plural(len(g.Targets)), strings.ToLower(g.Worst.String()), worst.ID,
-			worst.Exploit.EPSS, g.KEV, fix); err != nil {
+			worst.Exploit.EPSS, g.KEV, fix, capAt(g.Targets, 5)); err != nil {
 			return err
 		}
 	}
@@ -41,26 +41,26 @@ func writeSweepText(w io.Writer, s Sweep, l Layout) error {
 		return nil
 	}
 	if l == LayoutFix && t.held > 0 {
-		writeSweepFixText(w, s)
+		writeSweepFixText(w, s, t)
 		return nil
 	}
 	writeSweepRepoText(w, s)
 	return nil
 }
 
-func writeSweepFixText(w io.Writer, s Sweep) {
+func writeSweepFixText(w io.Writer, s Sweep, t fleetTotals) {
 	groups := fleetGroups(s)
 	verb := "clear"
 	if len(groups) == 1 {
 		verb = "clears"
 	}
 	fmt.Fprintf(w, "%d findings across %d repos, %d fix%s %s them\n\n",
-		totalsOf(s).held, repoCount(s), len(groups), plural(len(groups)), verb)
+		t.held, repoCount(s), len(groups), plural(len(groups)), verb)
 	for _, g := range groups {
 		writeGroup(w, g)
 	}
 	writeRepoNotes(w, s)
-	writeSweepSummary(w, s, totalsOf(s), len(groups))
+	writeSweepSummary(w, s, t, len(groups))
 }
 
 func writeSweepRepoText(w io.Writer, s Sweep) {

@@ -80,13 +80,17 @@ func fleetSweep() output.Sweep {
 }
 
 // TestSweepLineByFixIsOneLinePerFix is v1.4's exit criterion at fleet scale in
-// miniature: N repos sharing one pending upgrade print one line, not N.
+// miniature: N repos sharing one pending upgrade print one line, not N — and
+// the grouped line still says which repos it covers, since a machine acting on
+// it needs the where as much as the what.
 func TestSweepLineByFixIsOneLinePerFix(t *testing.T) {
 	stdout, _ := outWriteSweepLayout(t, output.Line, output.LayoutFix, fleetSweep())
 	if lines := strings.Count(stdout, "\n"); lines != 1 {
 		t.Fatalf("stdout has %d lines, want 1:\n%s", lines, stdout)
 	}
-	for _, want := range []string{"Go:chi@5.0.12: 2 findings in 2 targets", "fix=5.0.12"} {
+	for _, want := range []string{
+		"Go:chi@5.0.12: 2 findings in 2 targets", "fix=5.0.12", "targets=api, web",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to carry %q", stdout, want)
 		}

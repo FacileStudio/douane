@@ -10,10 +10,15 @@ import (
 	"github.com/FacileStudio/douane/internal/output"
 )
 
-// discover lists the projects directly under root. It does not recurse: a
-// sweep runs over a directory of checkouts, and walking deeper would rediscover
-// every nested app as a repository of its own.
+// discover lists the projects to sweep. Point it at a directory of checkouts
+// and it takes each direct child that is one; point it at a checkout itself
+// and it sweeps that, rather than reporting an empty fleet. It does not
+// recurse: walking deeper would rediscover every nested app as a repository of
+// its own.
 func discover(root string) ([]string, error) {
+	if isProject(root) {
+		return []string{filepath.Clean(root)}, nil
+	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
