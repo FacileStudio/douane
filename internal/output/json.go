@@ -26,15 +26,16 @@ type findingJSON struct {
 // "nothing held" from "douane could not tell", and findings and gaps are
 // always arrays so a consumer can count them without a null check.
 type reportJSON struct {
-	SchemaVersion string        `json:"schema_version,omitempty"`
-	Name          string        `json:"name,omitempty"`
-	Target        string        `json:"target"`
-	Packages      int           `json:"packages"`
-	Complete      bool          `json:"complete"`
-	Failed        bool          `json:"failed,omitempty"`
-	Findings      []findingJSON `json:"findings"`
-	Gaps          []finding.Gap `json:"gaps"`
-	Warnings      []string      `json:"warnings,omitempty"`
+	SchemaVersion string          `json:"schema_version,omitempty"`
+	Name          string          `json:"name,omitempty"`
+	Target        string          `json:"target"`
+	Packages      int             `json:"packages"`
+	Complete      bool            `json:"complete"`
+	Failed        bool            `json:"failed,omitempty"`
+	Findings      []findingJSON   `json:"findings"`
+	Groups        []finding.Group `json:"groups"`
+	Gaps          []finding.Gap   `json:"gaps"`
+	Warnings      []string        `json:"warnings,omitempty"`
 }
 
 type sweepJSON struct {
@@ -54,13 +55,17 @@ func reportBody(r Report) reportJSON {
 	for _, f := range r.Findings {
 		fs = append(fs, findingJSON{Finding: f, Key: f.Key(), New: r.New[f.Key()]})
 	}
+	groups := finding.Groups(r.Findings, func(f finding.Finding) bool { return r.New[f.Key()] })
+	if groups == nil {
+		groups = []finding.Group{}
+	}
 	gaps := r.Gaps
 	if gaps == nil {
 		gaps = []finding.Gap{}
 	}
 	return reportJSON{Name: r.Name, Target: r.Target, Packages: r.Packages,
-		Complete: r.Complete(), Failed: r.Failed, Findings: fs, Gaps: gaps,
-		Warnings: r.Warnings}
+		Complete: r.Complete(), Failed: r.Failed, Findings: fs, Groups: groups,
+		Gaps: gaps, Warnings: r.Warnings}
 }
 
 // MarshalJSON emits a scan as its own document, schema version and all.

@@ -35,7 +35,7 @@ func runSweep(args []string) int {
 	result.Warnings = append(warnings, result.Warnings...)
 
 	form := output.Resolve(output.Format(opts.format), os.Stdout)
-	if err := output.WriteSweepTo(os.Stdout, os.Stderr, form, result); err != nil {
+	if err := output.WriteSweepTo(os.Stdout, os.Stderr, form, output.Layout(opts.by), result); err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return exitUsage
 	}
@@ -134,7 +134,8 @@ func union(repos []*repoScan) []finding.Package {
 // buildFrom builds one repository's findings from the shared resolution. It
 // walks that repository's own packages, so a finding reports the lockfile it
 // was actually read from, and dedup stays per repository.
-func buildFrom(pkgs []finding.Package, ids map[string][]string, vulns map[string]osv.Vuln) ([]finding.Finding, []finding.Gap) {
+func buildFrom(pkgs []finding.Package, ids map[string][]string,
+	vulns map[string]osv.Vuln) ([]finding.Finding, []finding.Gap) {
 	byIndex := make([][]string, len(pkgs))
 	for i, p := range pkgs {
 		byIndex[i] = ids[pkgKey(p)]

@@ -3,34 +3,106 @@ package output
 import (
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/FacileStudio/douane/internal/finding"
 )
 
-func writeSweepLine(w io.Writer, s Sweep) error {
-	for _, r := range s.Repos {
-		if err := writeLinePrefixed(w, r.Name+": ", r); err != nil {
+func writeSweepLine(w io.Writer, s Sweep, l Layout) error {
+	if l == LayoutFinding {
+		return sweepFlatLines(w, s)
+	}
+	return sweepFixLines(w, s)
+}
+
+func sweepFixLines(w io.Writer, s Sweep) error {
+	for _, g := range fleetGroups(s) {
+		fix := g.FixedIn
+		if fix == "" {
+			fix = "no-fix"
+		}
+		worst := g.WorstFinding()
+		if _, err := fmt.Fprintf(w,
+			"%s:%s@%s: %d finding%s in %d target%s: %s: worst=%s [epss=%.4f kev=%t fix=%s]\n",
+			g.Ecosystem, g.Package, fix, g.Count, plural(g.Count), len(g.Targets),
+			plural(len(g.Targets)), strings.ToLower(g.Worst.String()), worst.ID,
+			worst.Exploit.EPSS, g.KEV, fix); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func writeSweepText(w io.Writer, s Sweep) error {
+func writeSweepText(w io.Writer, s Sweep, l Layout) error {
 	writeNotesText(w, s.Gaps, s.Warnings)
-	held, packages, kev := sweepTotals(s)
-	if held == 0 && !anyNote(s) {
-		fmt.Fprintf(w, "clear — %d repos, %d packages, nothing held\n", len(s.Repos), packages)
+	t := totalsOf(s)
+	if t.held == 0 && !anyNote(s) {
+		fmt.Fprintf(w, "clear — %d repos, %d packages, nothing held\n", len(s.Repos), t.packages)
 		return nil
 	}
+	if l == LayoutFix && t.held > 0 {
+		writeSweepFixText(w, s)
+		return nil
+	}
+	writeSweepRepoText(w, s)
+	return nil
+}
+
+func writeSweepFixText(w io.Writer, s Sweep) {
+	groups := fleetGroups(s)
+	verb := "clear"
+	if len(groups) == 1 {
+		verb = "clears"
+	}
+	fmt.Fprintf(w, "%d findings across %d repos, %d fix%s %s them\n\n",
+		totalsOf(s).held, repoCount(s), len(groups), plural(len(groups)), verb)
+	for _, g := range groups {
+		writeGroup(w, g)
+	}
+	writeRepoNotes(w, s)
+	writeSweepSummary(w, s, totalsOf(s), len(groups))
+}
+
+func writeSweepRepoText(w io.Writer, s Sweep) {
 	for _, r := range s.Repos {
 		if len(r.Findings) == 0 && len(r.Warnings) == 0 && len(r.Gaps) == 0 {
 			continue
 		}
 		writeRepo(w, r)
 	}
-	writeSweepSummary(w, s, held, packages, kev)
-	return nil
+	writeSweepSummary(w, s, totalsOf(s), 0)
 }
 
+// fleetGroups groups every finding in the run by the fix that clears it,
+// attributing each to its repository name rather than the lockfile path a
+// single scan would show.
+func fleetGroups(s Sweep) []finding.Group {
+	newSet := map[string]bool{}
+	var fs []finding.Finding
+	for _, r := range s.Repos {
+		for k := range r.New {
+			newSet[k] = true
+		}
+		for _, f := range r.Findings {
+			f.Target = r.Name
+			fs = append(fs, f)
+		}
+	}
+	return finding.Groups(fs, func(f finding.Finding) bool { return newSet[f.Key()] })
+}
+
+// writeRepoNotes keeps the grouped view honest: a fix can collapse the
+// findings, but a repo the scanner could not fully read must still say so, by
+// name, or the group line reads as more certainty than the sweep earned.
+func writeRepoNotes(w io.Writer, s Sweep) {
+	for _, r := range s.Repos {
+		if len(r.Gaps) == 0 && len(r.Warnings) == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "%s:\n", r.Name)
+		writeNotesText(w, r.Gaps, r.Warnings)
+	}
+}
 func writeRepo(w io.Writer, r Report) {
 	fmt.Fprintf(w, "%s — %d held out of %d packages\n\n", r.Name, len(r.Findings), r.Packages)
 	writeNotesText(w, r.Gaps, r.Warnings)

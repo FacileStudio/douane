@@ -21,9 +21,13 @@ func outSweep() output.Sweep {
 }
 
 func outWriteSweep(t *testing.T, f output.Format, s output.Sweep) (stdout, stderr string) {
+	return outWriteSweepLayout(t, f, output.LayoutFinding, s)
+}
+
+func outWriteSweepLayout(t *testing.T, f output.Format, l output.Layout, s output.Sweep) (stdout, stderr string) {
 	t.Helper()
 	var out, errw bytes.Buffer
-	if err := output.WriteSweepTo(&out, &errw, f, s); err != nil {
+	if err := output.WriteSweepTo(&out, &errw, f, l, s); err != nil {
 		t.Fatalf("WriteSweepTo: %v", err)
 	}
 	return out.String(), errw.String()
@@ -59,6 +63,54 @@ func TestSweepLineTagsNotesWithTheirRepo(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "douane: gap: web: unsupported: web:") {
 		t.Fatalf("stderr = %q, want the gap tagged with its repo", stderr)
+	}
+}
+
+// fleetSweep is two repos holding the same advisory at different versions:
+// the case where per-repo reporting says the same bump twice.
+func fleetSweep() output.Sweep {
+	mk := func(name, installed string) output.Report {
+		f := finding.Finding{ID: "GO-1", Package: "chi", Ecosystem: "Go",
+			Installed: installed, FixedIn: "5.0.12", Severity: finding.SevHigh,
+			Target: name + "/go.mod"}
+		return output.Report{Name: name, Packages: 10,
+			Findings: []finding.Finding{f}}
+	}
+	return output.Sweep{Root: "/fleet", Repos: []output.Report{mk("api", "5.0.0"), mk("web", "4.11.0")}}
+}
+
+// TestSweepLineByFixIsOneLinePerFix is v1.4's exit criterion at fleet scale in
+// miniature: N repos sharing one pending upgrade print one line, not N.
+func TestSweepLineByFixIsOneLinePerFix(t *testing.T) {
+	stdout, _ := outWriteSweepLayout(t, output.Line, output.LayoutFix, fleetSweep())
+	if lines := strings.Count(stdout, "\n"); lines != 1 {
+		t.Fatalf("stdout has %d lines, want 1:\n%s", lines, stdout)
+	}
+	for _, want := range []string{"Go:chi@5.0.12: 2 findings in 2 targets", "fix=5.0.12"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout = %q, want it to carry %q", stdout, want)
+		}
+	}
+}
+
+func TestSweepTextByFixKeepsRepoGapsVisible(t *testing.T) {
+	s := fleetSweep()
+	s.Repos = append(s.Repos, output.Report{Name: "opaque",
+		Gaps: []finding.Gap{{Kind: finding.GapUnsupported, Subject: "web",
+			Detail: "no lockfile douane can read"}}})
+	stdout, _ := outWriteSweepLayout(t, output.Text, output.LayoutFix, s)
+	if !strings.Contains(stdout, "opaque:\n  ? unsupported: web:") {
+		t.Fatalf("text = %q, want the unreadable repo named under its gap", stdout)
+	}
+	if !strings.Contains(stdout, "2 findings across 2 repos, 1 fix clears them") {
+		t.Fatalf("text = %q, want the grouped headline", stdout)
+	}
+}
+
+func TestSweepTextByFindingKeepsPerRepoBlocks(t *testing.T) {
+	stdout, _ := outWriteSweepLayout(t, output.Text, output.LayoutFinding, fleetSweep())
+	if got := strings.Count(stdout, "— 1 held out of 10 packages"); got != 2 {
+		t.Fatalf("text has %d repo blocks, want one per holding repo:\n%s", got, stdout)
 	}
 }
 

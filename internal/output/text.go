@@ -8,15 +8,23 @@ import (
 	"github.com/FacileStudio/douane/internal/finding"
 )
 
-func writeText(w io.Writer, r Report) error {
+func writeText(w io.Writer, r Report, l Layout) error {
 	writeNotesText(w, r.Gaps, r.Warnings)
 	if len(r.Findings) == 0 {
 		return writeNothingHeld(w, r)
 	}
-	for _, f := range r.Findings {
-		writeFinding(w, f, r.New[f.Key()])
+	if l == LayoutFinding {
+		for _, f := range r.Findings {
+			writeFinding(w, f, r.New[f.Key()])
+		}
+		writeSummary(w, r, 0)
+		return nil
 	}
-	writeSummary(w, r)
+	groups := finding.Groups(r.Findings, isNewFn(r))
+	for _, g := range groups {
+		writeGroup(w, g)
+	}
+	writeSummary(w, r, len(groups))
 	return nil
 }
 
@@ -78,7 +86,9 @@ func fixLabel(f finding.Finding) string {
 	return "fix " + f.FixedIn
 }
 
-func writeSummary(w io.Writer, r Report) {
+// writeSummary closes a scan. fixes is how many actions the grouped view
+// reduced the findings to; zero means flat mode, which has nothing to add.
+func writeSummary(w io.Writer, r Report, fixes int) {
 	kev := 0
 	for _, f := range r.Findings {
 		if f.Exploit.KEV {
@@ -86,6 +96,9 @@ func writeSummary(w io.Writer, r Report) {
 		}
 	}
 	fmt.Fprintf(w, "%d held out of %d packages", len(r.Findings), r.Packages)
+	if fixes > 0 {
+		fmt.Fprintf(w, " in %d fix%s", fixes, plural(fixes))
+	}
 	if kev > 0 {
 		fmt.Fprintf(w, " — %d known exploited", kev)
 	}

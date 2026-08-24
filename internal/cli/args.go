@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/FacileStudio/douane/internal/output"
 )
 
 // options is one invocation, already parsed and validated. done marks a run
@@ -14,6 +16,7 @@ import (
 type options struct {
 	path     string
 	format   string
+	by       string
 	failOn   string
 	fail     threshold
 	dbPath   string
@@ -46,7 +49,21 @@ func parseArgs(name string, args []string) (options, int) {
 	if len(paths) == 1 {
 		opts.path = paths[0]
 	}
+	if code := resolveBy(&opts); code != exitClear {
+		return opts, code
+	}
 	return opts, resolveFail(&opts)
+}
+
+// resolveBy turns -by into the layout output renders. fix groups findings by
+// the action that clears them; finding restores the flat list.
+func resolveBy(opts *options) int {
+	switch output.Layout(opts.by) {
+	case output.LayoutFix, output.LayoutFinding:
+		return exitClear
+	}
+	fmt.Fprintf(os.Stderr, "douane: unknown -by value %q\n", opts.by)
+	return exitUsage
 }
 
 // newFlagSet declares the flags. Its usage function is empty on purpose: the
@@ -57,6 +74,7 @@ func newFlagSet(name string, opts *options) *flag.FlagSet {
 	fs.SetOutput(os.Stderr)
 	fs.Usage = func() {}
 	fs.StringVar(&opts.format, "format", "auto", "")
+	fs.StringVar(&opts.by, "by", "fix", "")
 	fs.StringVar(&opts.failOn, "fail", "never", "")
 	fs.StringVar(&opts.dbPath, "db", opts.dbPath, "")
 	fs.BoolVar(&opts.noEnrich, "no-enrich", false, "")

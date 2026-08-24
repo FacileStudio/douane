@@ -24,6 +24,8 @@ The path may be given before or after the flags.
 
 Flags:
   -format auto|text|line|json   output shape (default auto)
+  -by     fix|finding           group by the fix that clears findings (default fix),
+                                or print one line per finding
   -fail   never|any|low|medium|high|critical|kev
                                 exit 1 at or above (default never)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
@@ -77,7 +79,7 @@ func runScan(args []string) int {
 	report.Warnings = append(warnings, report.Warnings...)
 
 	form := output.Resolve(output.Format(opts.format), os.Stdout)
-	if err := output.WriteTo(os.Stdout, os.Stderr, form, report); err != nil {
+	if err := output.WriteTo(os.Stdout, os.Stderr, form, output.Layout(opts.by), report); err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return exitUsage
 	}

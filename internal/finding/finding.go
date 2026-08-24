@@ -1,5 +1,7 @@
 package finding
 
+import "encoding/json"
+
 // Severity is the coarse impact rating carried by an advisory.
 type Severity int
 
@@ -30,6 +32,28 @@ func ParseSeverity(s string) Severity {
 // MarshalJSON emits a Severity as its uppercase word rather than its ordinal.
 func (s Severity) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + s.String() + `"`), nil
+}
+
+// UnmarshalJSON reads back what MarshalJSON emits, so a document douane wrote
+// parses into the same severity it came from.
+func (s *Severity) UnmarshalJSON(b []byte) error {
+	var word string
+	if err := json.Unmarshal(b, &word); err != nil {
+		return err
+	}
+	switch word {
+	case "CRITICAL":
+		*s = SevCritical
+	case "HIGH":
+		*s = SevHigh
+	case "MEDIUM":
+		*s = SevMedium
+	case "LOW":
+		*s = SevLow
+	default:
+		*s = SevUnknown
+	}
+	return nil
 }
 
 // String renders a Severity as the uppercase word used in output.

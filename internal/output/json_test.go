@@ -10,7 +10,7 @@ import (
 )
 
 func TestJSONCarriesNewCompleteAndSchema(t *testing.T) {
-	stdout, _ := outWriteTo(t, output.JSON, outReport())
+	stdout, _ := outWriteTo(t, output.JSON, output.LayoutFix, outReport())
 	var doc struct {
 		SchemaVersion string `json:"schema_version"`
 		Complete      bool   `json:"complete"`
@@ -19,7 +19,8 @@ func TestJSONCarriesNewCompleteAndSchema(t *testing.T) {
 			Key string `json:"key"`
 			New bool   `json:"new"`
 		} `json:"findings"`
-		Gaps []finding.Gap `json:"gaps"`
+		Gaps   []finding.Gap   `json:"gaps"`
+		Groups []finding.Group `json:"groups"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
 		t.Fatalf("decode %s: %v", stdout, err)
@@ -41,11 +42,36 @@ func TestJSONCarriesNewCompleteAndSchema(t *testing.T) {
 	}
 }
 
+// TestJSONCarriesBothShapesLosslessly is v1.4's json contract: grouping is a
+// presentation choice, so the flat findings stay verbatim next to the derived
+// groups and neither view can drop what the other holds.
+func TestJSONCarriesBothShapesLosslessly(t *testing.T) {
+	r := outReport()
+	f2 := outFinding("GO-2")
+	f2.Installed = "4.11.0"
+	r.Findings = append(r.Findings, f2)
+	stdout, _ := outWriteTo(t, output.JSON, output.LayoutFix, r)
+	var doc struct {
+		Findings []map[string]any `json:"findings"`
+		Groups   []finding.Group  `json:"groups"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+		t.Fatalf("decode %s: %v", stdout, err)
+	}
+	if len(doc.Findings) != 2 || len(doc.Groups) != 1 {
+		t.Fatalf("findings=%d groups=%d, want both shapes: 2 flat, 1 grouped",
+			len(doc.Findings), len(doc.Groups))
+	}
+	if doc.Groups[0].Count != 2 || len(doc.Groups[0].Installed) != 2 {
+		t.Fatalf("group = %+v, want count 2 across both installed versions", doc.Groups[0])
+	}
+}
+
 // TestJSONEmitsArraysNotNull keeps `jq '.findings | length'` working on a
 // clean run, which is the shape CI checks first.
 func TestJSONEmitsArraysNotNull(t *testing.T) {
-	stdout, _ := outWriteTo(t, output.JSON, output.Report{Target: "/repo"})
-	for _, want := range []string{`"findings": []`, `"gaps": []`, `"complete": true`} {
+	stdout, _ := outWriteTo(t, output.JSON, output.LayoutFix, output.Report{Target: "/repo"})
+	for _, want := range []string{`"findings": []`, `"gaps": []`, `"groups": []`, `"complete": true`} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("json = %s, want it to carry %s", stdout, want)
 		}

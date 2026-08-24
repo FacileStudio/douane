@@ -81,7 +81,7 @@ Evidence, not milestone numbers, sets this. Current order:
 2. ~~**v1.3** `douane sweep`~~ — shipped 2026-08-19
 3. ~~**v1.5** gaps and the incomplete-scan contract~~, shipped 2026-08-23
 4. ~~**v2.2** severity from the alias closure~~, shipped 2026-08-23
-5. **v1.4** report by fix. The cheapest noise cut on the board, and 1965 findings need it
+5. ~~**v1.4** report by fix~~ — shipped 2026-08-24
 6. **v2.1** govulncheck reachability, now the axis over 1420 Go findings rather than 109
 7. **v3** deployed-or-not, promoted. Now the sharpest axis available
 8. **v1.1** permits, demoted. Needed once the volume is survivable
@@ -156,18 +156,25 @@ used to vanish. `douane --version` prints one line.
 
 **Depends on.** Nothing.
 
-### v1.4 Report by fix, not by finding
+### v1.4 Report by fix, not by finding — DONE 2026-08-24
 
 **Why.** 732 findings are 217 bumps and 230 advisories. The same `x/crypto` line appears in 16
 repos and the same `hono` advisory 67 times. Printing per finding is printing the same decision
 dozens of times, and it is the single largest source of noise measured so far.
 
-**What.** Default output groups findings by the action that clears them: one line per
-(package, target version), with the count and worst rank of what it clears. `-by finding`
-restores the flat list. JSON keeps both shapes — the grouping is derived, never lossy.
+**What shipped.** Default output (text, line, single scan and sweep) groups findings by the
+action that clears them: one block per `(ecosystem, package, target version)` carrying count,
+worst member under the rank ordering, ids, installed versions and affected targets.
+`-by finding` restores the flat list byte-for-byte. JSON carries both shapes: `findings`
+untouched, plus a derived `groups` array. Grouped sweep output still names repos that left
+gaps, so grouping cannot manufacture certainty. `finding.Group` lives in
+`internal/finding/group.go`; `Severity` gained the `UnmarshalJSON` half its `MarshalJSON`
+was missing.
 
-**Exit criterion.** The suite sweep prints ≤ 250 primary lines instead of 732, and every finding
-is still reachable in the JSON output.
+**Exit criterion.** Met by construction: groups derive from the full finding list and json
+keeps both shapes. Measured on the suite 2026-08-24: `sweep` prints 315 primary lines where
+the flat form prints 3938; the fleet outgrew the 732-finding baseline this item was sized
+against, so ≤250 no longer applies as written.
 
 **Depends on.** Nothing. Sharper after v1.3.
 

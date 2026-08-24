@@ -30,11 +30,11 @@ func (s Sweep) AllGaps() []finding.Gap {
 func (s Sweep) Complete() bool { return len(s.AllGaps()) == 0 }
 
 // WriteSweep renders a fleet run in the given format, everything on w.
-func WriteSweep(w io.Writer, f Format, s Sweep) error { return WriteSweepTo(w, w, f, s) }
+func WriteSweep(w io.Writer, f Format, s Sweep) error { return WriteSweepTo(w, w, f, LayoutFix, s) }
 
 // WriteSweepTo renders a fleet run, data on out and notes on errw. See WriteTo
 // for why the two streams are worth separating.
-func WriteSweepTo(out, errw io.Writer, f Format, s Sweep) error {
+func WriteSweepTo(out, errw io.Writer, f Format, l Layout, s Sweep) error {
 	if f == JSON || f == Line {
 		if err := writeSweepNotes(errw, s); err != nil {
 			return err
@@ -44,9 +44,9 @@ func WriteSweepTo(out, errw io.Writer, f Format, s Sweep) error {
 	case JSON:
 		return encodeJSON(out, s)
 	case Line:
-		return writeSweepLine(out, s)
+		return writeSweepLine(out, s, l)
 	default:
-		return writeSweepText(out, s)
+		return writeSweepText(out, s, l)
 	}
 }
 

@@ -44,6 +44,8 @@ douane scan  [path] [flags]   inspect one project
 douane sweep [dir]  [flags]   inspect every repository under a directory
 
   -format auto|text|line|json   output shape (default auto)
+  -by     fix|finding           group by the fix that clears findings (default fix),
+                                or print one block per finding
   -fail   never|any|low|medium|high|critical|kev
                                 exit 1 at or above (default never)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
@@ -60,6 +62,12 @@ most of their dependency tree, so a fleet of 27 repos is far closer to one scan 
 `-format auto` prints the human report on a terminal and the one-per-line form everywhere
 else, so pipes and agent tool calls get the parseable version without asking. The path may
 be given before or after the flags.
+
+`-by fix`, the default, prints one block per action that clears findings: take one package
+to one target version. Two advisories against the same package at two installed versions are
+one decision, so they print once with a count instead of twice. `-by finding` restores the
+flat per-finding list. JSON always carries both shapes: `findings` untouched, plus a derived
+`groups` array.
 
 ## Exit codes
 

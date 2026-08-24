@@ -55,6 +55,24 @@ func TestParseArgsRejectsAnUnknownFail(t *testing.T) {
 	}
 }
 
+func TestParseArgsDefaultsToGroupedByFix(t *testing.T) {
+	cliQuiet(t)
+	opts, code := parseArgs("scan", []string{"/target"})
+	if code != exitClear || opts.by != "fix" {
+		t.Fatalf("by = %q code = %d, want fix %d", opts.by, code, exitClear)
+	}
+	if _, code := parseArgs("scan", []string{"-by", "finding", "/target"}); code != exitClear {
+		t.Fatalf("code = %d, want %d — the flat view must stay reachable", code, exitClear)
+	}
+}
+
+func TestParseArgsRejectsAnUnknownLayout(t *testing.T) {
+	cliQuiet(t)
+	if _, code := parseArgs("scan", []string{"-by", "mood"}); code != exitUsage {
+		t.Fatalf("code = %d, want %d — an unknown layout must fail before scanning", code, exitUsage)
+	}
+}
+
 func TestExitForRanksFindingsOverAnIncompleteScan(t *testing.T) {
 	gaps := []finding.Gap{{Kind: finding.GapUpstream, Subject: "kev", Detail: "429"}}
 	high := []finding.Finding{{Severity: finding.SevHigh}}

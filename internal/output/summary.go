@@ -10,12 +10,20 @@ import (
 // only partly determined.
 type tally struct{ clear, failed, incomplete int }
 
+// fleetTotals is the three numbers every closing line needs.
+type fleetTotals struct{ held, packages, kev int }
+
 // writeSweepSummary closes a fleet run: one row per repository holding
-// findings, then the totals.
-func writeSweepSummary(w io.Writer, s Sweep, held, packages, kev int) {
-	t := writeRepoRows(w, s.Repos)
-	fmt.Fprintf(w, "\n%d held out of %d packages across %d repos", held, packages, len(s.Repos))
-	writeSweepTail(w, kev, t)
+// findings, then the totals. fixes is the grouped view's action count, zero in
+// flat mode.
+func writeSweepSummary(w io.Writer, s Sweep, t fleetTotals, fixes int) {
+	tally := writeRepoRows(w, s.Repos)
+	fmt.Fprintf(w, "\n%d held out of %d packages across %d repos",
+		t.held, t.packages, len(s.Repos))
+	if fixes > 0 {
+		fmt.Fprintf(w, " in %d fix%s", fixes, plural(fixes))
+	}
+	writeSweepTail(w, t.kev, tally)
 }
 
 func writeRepoRows(w io.Writer, repos []Report) tally {
@@ -64,17 +72,17 @@ func writeSweepTail(w io.Writer, kev int, t tally) {
 	fmt.Fprintln(w)
 }
 
-func sweepTotals(s Sweep) (held, packages, kev int) {
+func totalsOf(s Sweep) (t fleetTotals) {
 	for _, r := range s.Repos {
-		held += len(r.Findings)
-		packages += r.Packages
+		t.held += len(r.Findings)
+		t.packages += r.Packages
 		for _, f := range r.Findings {
 			if f.Exploit.KEV {
-				kev++
+				t.kev++
 			}
 		}
 	}
-	return held, packages, kev
+	return t
 }
 
 // anyNote reports whether the run has anything to say beyond its findings. A
