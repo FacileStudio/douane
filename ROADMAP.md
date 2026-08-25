@@ -1,6 +1,6 @@
 # douane roadmap
 
-The wiki holds the evidence (`~/.jardin/memory/projects/douane.md`). This file holds the order.
+The wiki holds the evidence (`~/.mycelium/memory/projects/douane.md`). This file holds the order.
 
 Every milestone has an **exit criterion** — something verifiable, not a feeling. Milestone
 numbers are stable identities, not a sequence: the order of work is stated once, below, and
@@ -277,7 +277,7 @@ seen by both sources report `sources: ["osv", "dependabot"]`.
 **Why.** douane's verdict changes when the world changes, not when you commit. A scanner you must
 remember to run reports on your last panic, not your current risk.
 
-**What.** A jardin flow on ruche running `douane sweep` nightly, diffing against sqlite, alerting
+**What.** A mycelium flow on ruche running `douane sweep` nightly, diffing against sqlite, alerting
 through **antenne** only on what is new or newly escalated. Given the baseline, the alert
 threshold is "new since yesterday", never the standing total.
 
