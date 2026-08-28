@@ -18,9 +18,21 @@ filet, is unforgiving:
 
 > A sweep over a healthy suite prints **zero lines**.
 
-We are **1965 lines** away from it, measured 2026-08-23 over 29 repos. That gap is the roadmap,
-and v1.5 widened it on purpose: 656 of those lines were visible before, and the other 1308 are
-the Go standard library and toolchain, which douane had never queried. npm is unchanged at 544.
+We are **3816 findings** away from it, measured 2026-08-28 over the 65 working copies on lucy.
+That gap is the roadmap, and the shape of it is now known rather than guessed:
+
+| Cut | Findings | Where the work lives |
+|---|---|---|
+| Go stdlib and toolchain | 1879 (49%) | **not douane.** Bump the `go` directive in 38 repos |
+| npm reachable only from `devDependencies` | 523 of 1371 classified (38%) | v2.3 |
+| RUSTSEC informational, not vulnerabilities | 77 of 141 crates findings (55%) | v2.4 |
+| Go dependencies that are not the toolchain | 124 | v2.1 |
+
+Read that table before picking up any milestone. **Half of the number this roadmap is
+calibrated against is one chore repeated 38 times, and douane has already answered it
+correctly.** No feature clears those 1879 findings; a `go` directive does. Adding scanner
+features to reduce a count that a dependency bump would reduce is the exact failure mode the
+through-line exists to catch.
 
 ---
 
@@ -73,19 +85,111 @@ still necessary and no longer urgent.
 
 ---
 
+## v0.2 — the baseline remeasured, 2026-08-28
+
+**3816 findings · 463 distinct advisories · 315 fleet fix groups · 250 (repo, package) bumps ·
+0 on KEV.**
+
+Measured on **lucy** over the 65 working copies in `~/Projects/Facile/Code`, enriched, 32s warm,
+`douane 0.2.2`. Ecosystems: Go 2003, npm 1672, crates.io 141. Severity: 1707 medium, 1632 high,
+218 low, 136 critical, 123 unknown. 87 findings have no fix. 45 gaps: 43 severity, 2 unsupported.
+Five repos already print zero lines: `ardoise-cli`, `authentik-config`, `croc`, `perception-js`,
+`portail`.
+
+### Every previous number in this file was measured on less than half the fleet
+
+ruche holds **30** directories under `~/Code/Facile`. lucy holds **65**. The 732-finding and
+1965-finding baselines were taken on ruche, so they were never fleet-wide, and the jump to 3816
+is mostly that, not a new class of finding. ruche also has **no Go toolchain, no `govulncheck`
+and no `douane` binary** installed today, though `~/.douane.db` is there. This settles the "where
+does the sweep run" open decision below and adds prerequisites to v5.1.
+
+### The decision count did not move when the fleet doubled
+
+29 repos produced 315 fix groups on 2026-08-24. 65 repos produce **315** fix groups today.
+Findings went from 1965 to 3816 and the number of distinct decisions stayed flat, because
+sibling repos share their dependency trees. That is the tool's whole thesis, measured. It also
+means **per-repo finding counts are the wrong headline** and the fleet group count is the right
+one.
+
+### EPSS is no longer thin, and the stdlib is why
+
+The v0.1 baseline saw two findings above 5% and a cliff. Today: **16 above 5%, 14 above 10%, and
+one at 92%**, which is `CVE-2023-45288` in the Go `stdlib`, in `backend-protobuf-poc`. The single
+sharpest finding in the fleet came from the coverage v1.5 added, and it sits in a proof of
+concept that is almost certainly not deployed. That is v3's argument in one line.
+
+### KEV is silent for the third time
+
+Zero hits out of 3816, enriched. Two prior measurements at 732 and 1965 said the same. Treat
+`-fail kev` as a tripwire that has never fired, never as the gate.
+
+### Two correctness defects that a bigger fleet made visible
+
+**541 findings (14%), across 45 repos, are reported under an advisory id that OSV does not
+serve.** `Canonical` in `internal/osv/resolve.go` ranks CVE > GHSA > everything else and takes
+the winner out of the alias list without checking it resolves. 27 distinct ids, 25 of them CVEs
+promoted over the `GO-*` record that OSV actually returned. The id that works is demoted to an
+alias, and the alias closure then cannot fetch the promoted one, so those findings also land
+UNKNOWN. v1.6.
+
+**All 43 severity gaps now have a cause, and only 3 are irreducible.** Probing every gap subject
+against OSV: **32 are RUSTSEC informational advisories** (26 unmaintained, 6 unsound) that carry
+no severity by design and should never have been gaps at all, **8 are the unresolvable ids
+above**, and **3 are genuinely unrated** (`GO-2026-5932`, `RUSTSEC-2026-0204`,
+`RUSTSEC-2026-0235`). So v2.4 clears 32, v1.6 clears 8, and the honest residue is 3. Neither
+milestone needs to touch `internal/osv/severity.go`, which is doing its job.
+
+**A withdrawn advisory is reported as live.** `osv.Vuln` has no `withdrawn` field, so the schema's
+own retraction marker is invisible. Measured: `CVE-2024-24788`, withdrawn 2025-02-28, still
+reported against `backend-protobuf-poc`. One finding today, and no upper bound on tomorrow. v1.6.
+
+### Two ecosystems are unreadable, and one of them is a flagship
+
+`Opus` ships `pnpm-lock.yaml` and `Echo` ships `services/transcriber/requirements.txt`. Both
+raise an honest `unsupported` gap, so nothing is silently green, but Opus is a full product and
+douane can see none of it. v1.7.
+
+---
+
 ## Order of work
 
-Evidence, not milestone numbers, sets this. Current order:
+Evidence, not milestone numbers, sets this. Reordered 2026-08-28 against the v0.2 baseline:
 
-1. ~~**v1.2** feed caching~~ — shipped 2026-08-19
-2. ~~**v1.3** `douane sweep`~~ — shipped 2026-08-19
+1. ~~**v1.2** feed caching~~, shipped 2026-08-19
+2. ~~**v1.3** `douane sweep`~~, shipped 2026-08-19
 3. ~~**v1.5** gaps and the incomplete-scan contract~~, shipped 2026-08-23
 4. ~~**v2.2** severity from the alias closure~~, shipped 2026-08-23
-5. ~~**v1.4** report by fix~~ — shipped 2026-08-24
-6. **v2.1** govulncheck reachability, now the axis over 1420 Go findings rather than 109
-7. **v3** deployed-or-not, promoted. Now the sharpest axis available
-8. **v1.1** permits, demoted. Needed once the volume is survivable
-9. **v4** Dependabot, **v5** automation
+5. ~~**v1.4** report by fix~~, shipped 2026-08-24
+6. **The Go directive chore.** Not a milestone and not douane's code. 1879 findings, 38 repos,
+   one line each. Do it first so every number below is measured against a fleet that is not
+   half noise.
+7. **v1.6** withdrawn and unresolvable ids. Correctness, 541 mislabelled findings, and 8 of the
+   43 severity gaps as a side effect. Smallest item on the list.
+8. **v2.3** dev-only dependencies. 523 findings, computable offline from the lockfile already
+   parsed, no new feed and no new binary. Now the largest cut douane itself can make.
+9. **v2.4** informational advisories. 77 findings, one field.
+10. **v5.1** the nightly daemon. The trigger the tool was built for, and the only one that
+    matches how the answer changes. Do it once the count is survivable, not before.
+11. **v3** deployed-or-not. Still the sharpest judgment axis, and now the one that separates the
+    92% EPSS finding in a PoC from the same finding in production.
+12. **v1.1** permits, then **v5.3** the introduced-finding gate. A repo cannot go green honestly
+    without permits, and CI cannot gate on anything until it can.
+13. **v2.1** govulncheck, **demoted**. After the chore its addressable set is 124 findings, not
+    2003. Still the only reachability there is, but it is no longer the headline.
+14. **v1.7** pnpm and pip, **v4** Dependabot, **v5.2** the skill.
+
+### Why v2.1 fell from first to thirteenth
+
+The v0.1 baseline framed reachability as the answer to a Go-heavy fleet, and v1.5 seemed to
+confirm it by taking Go from 109 findings to 2003. But 1879 of those 2003 are the standard
+library and toolchain, spread over 10 distinct `go` directives from 1.22 to 1.26.5, and the fix
+for every one of them is the same patch bump. Reachability earns its cost where the fix is
+expensive or absent. Here the fix is one line, in a file that is already being edited, so
+knowing which of the 1879 are reachable changes no decision.
+
+What is left afterwards is 124 Go dependency findings, which is the set v2.1 should be sized
+and judged against.
 
 ---
 
@@ -195,25 +299,156 @@ message naming the line.
 
 **Depends on.** Nothing.
 
+### v1.6 Withdrawn advisories, and ids that do not resolve
+
+**Why.** Two defects found in the v0.2 baseline, both in identity handling, both silent.
+
+`Canonical` (`internal/osv/resolve.go`) reports a finding under the highest-ranked id it can find
+in `{v.ID} ∪ v.Aliases`, CVE over GHSA over the rest, without checking that the winner exists in
+OSV. Measured: **541 findings across 45 repos**, 27 distinct ids, carry a primary identifier that
+`GET /v1/vulns/<id>` answers 404 for. `github.com/klauspost/compress@1.17.11` is reported as
+`GHSA-259r-337f-4rfw`, which 404s, while `GO-2026-5841`, which OSV returned and which resolves,
+sits in `aliases`. `h2` is reported as `GHSA-q83h-524g-xf6h` in 8 repos, same story, with
+`RUSTSEC-2026-0258` demoted. The closure then tries to fetch the promoted id to rate it, fails,
+and the finding lands UNKNOWN with a `GapSeverity`. That accounts for **8 of the 43 severity
+gaps**; the other 35 are v2.4's problem and 3 genuinely have no rating anywhere.
+
+The second is plainer: the OSV schema has a `withdrawn` timestamp and `osv.Vuln` has no field for
+it, so a retracted record is reported as a live vulnerability. Measured: `CVE-2024-24788`,
+withdrawn 2025-02-28, still reported.
+
+Preferring the CVE is not itself wrong. A CVE is the cross-ecosystem name and it resolves at
+nvd.nist.gov whether or not OSV carries a record. What is wrong is printing an identifier as a
+finding's primary key when the database it came from cannot answer for it, because that key is
+what a permit file (v1.1), the skill (v5.2) and any human follow-up all key on.
+
+**What.** `Withdrawn string` on `Vuln`, and a withdrawn record is dropped before it becomes a
+finding, not filtered at render. `Canonical` keeps its CVE preference but the promoted id must be
+one douane holds a record for; otherwise the id OSV returned stays primary and the CVE goes in
+`aliases` where it is still printed and still searchable. A negative fetch is cached for the feed
+TTL so 27 ids are not re-requested on every sweep.
+
+**Exit criterion.** Every `id` in `douane sweep -format json` answers 200 from
+`GET https://api.osv.dev/v1/vulns/<id>`, verified by probing the distinct set. No finding carries
+a `withdrawn` record. Severity gaps drop by 8 with no change to `internal/osv/severity.go`.
+
+**Depends on.** Nothing. Sharpens v1.1, v5.2 and v5.3, all of which key on the id.
+
+### v1.7 pnpm and pip
+
+**Why.** `Opus` is a full self-hosted product and douane reads none of it, because it is the
+suite's one pnpm monorepo. `Echo` ships a Python `requirements.txt` for its transcriber service.
+Both currently raise an `unsupported` gap, which is the honest answer and not a useful one.
+
+The blast radius is exactly two repos today, which is why this sits low. It moves up the moment
+a third arrives, and `pnpm-lock.yaml` is the one to build first: it is a lockfile with a resolved
+package list, where `requirements.txt` is frequently unpinned and may not answer at all.
+
+**What.** A parser per format behind the existing inventory interface. `pnpm-lock.yaml` v6 and v9
+`packages`/`snapshots` keys to npm ecosystem entries. `requirements.txt` only for lines pinned
+with `==`; anything looser raises an `unresolved` gap rather than guessing a version.
+
+**Exit criterion.** `douane scan` on Opus reports npm findings and no `unsupported` gap. An
+unpinned `requirements.txt` line produces a named gap, never a silent omission and never an
+assumed version.
+
+**Depends on.** Nothing.
+
 ---
 
 ## v2 — cut the noise
 
-### v2.1 govulncheck adapter (reachability)
+### v2.1 govulncheck adapter (reachability), demoted 2026-08-28
 
 **Why.** The one genuinely irreplaceable tool in the space. Call-graph analysis reports a Go CVE
-only if your code can reach the vulnerable function. The baseline says 109 Go findings, nearly
-all transitive `x/crypto` and `x/oauth2` — the exact shape reachability deletes.
-`Finding.Exploit.Reachable` is already a `*bool` waiting for it: `nil` means unchecked, and must
-never be conflated with `false`.
+only if your code can reach the vulnerable function. `Finding.Exploit.Reachable` is already a
+`*bool` waiting for it: `nil` means unchecked, and must never be conflated with `false`.
+
+**Why it dropped to thirteenth.** This was sized against 2003 Go findings. 1879 of those are the
+standard library and toolchain, and their fix is a `go` directive bump the repo wants anyway, so
+reachability changes no decision there. The honest addressable set is **124 Go dependency
+findings**, still mostly transitive `x/crypto` and `x/oauth2`, which is the shape reachability
+deletes but a tenth of the prize this milestone was written for.
 
 **What.** A `Scanner` interface with `govulncheck` as its second implementation, invoked when a
 `go.mod` is present and the binary is on PATH. Absent binary degrades to `nil`, never to `false`.
 
-**Exit criterion.** The Go finding count drops measurably against the 109 baseline, and every
-surviving Go finding reports `reachable: true`.
+**Exit criterion.** The **non-stdlib** Go finding count drops measurably against the 124 baseline,
+and every surviving Go dependency finding reports `reachable: true`. Stdlib findings are excluded
+from the measurement, not from the scan.
 
-**Depends on.** Nothing. Needs `govulncheck` installed on ruche, which currently has no Go.
+**Depends on.** The Go directive chore, so the 124 is what gets measured. Needs a Go toolchain and
+`govulncheck` wherever the sweep runs; ruche has neither today.
+
+### v2.3 Dev-only dependencies
+
+**Why.** After the Go chore, npm is the fleet at 1672 findings, and reachability in the
+govulncheck sense does not exist for it. The axis that does exist is in the lockfile already:
+a package reachable only from `devDependencies` ships in nobody's runtime. A vulnerable `esbuild`
+that builds the bundle is a different decision from a vulnerable `hono` that serves requests, and
+douane currently prints them identically.
+
+Measured on the v0.2 baseline by walking the graph offline. Of the 1404 npm findings in repos
+carrying a `bun.lock`, 1371 classify: **848 reachable from `dependencies`, 523 reachable only
+from `devDependencies`**. 38%, for one graph walk over a file douane already parses. The
+remaining 33 did not resolve to a lockfile key and the other 268 npm findings are in
+`package-lock.json` repos this walk did not cover. Worst offenders are the ones the fleet forks
+from: MonorepoBoilerplate 117, GFConseil 78, LPB 68, Heranova 53, Ardoise 50.
+
+Treat 38% as the order of magnitude, not the target. It is one prototype walk, and the
+milestone's own exit criterion is what settles the real number.
+
+**What.** Resolve each npm package to `prod`, `dev` or `both` and carry it on the finding.
+`bun.lock` gives the direct kinds per workspace and each `packages` entry carries its own
+dependencies, so the closure is computable with no network. `package-lock.json` states it
+outright with `"dev": true`. A package reachable both ways is `prod`; dev-only is a claim that
+needs the whole graph to hold, so it is never inferred from the direct list alone. Unresolvable
+attribution raises a gap and is treated as `prod`, because guessing wrong in that direction is
+the one that hides a real finding.
+
+`-scope prod|dev|all` filters, defaulting to `all` so the number never shrinks silently. The
+ranking demotes `dev` below `prod` at equal severity from day one, which is where most of the
+value is even before anyone passes a flag.
+
+**Exit criterion.** Every npm finding carries `scope`, `douane sweep -scope prod` returns a
+strictly smaller set than `-scope all`, and a package pulled in by both a runtime and a build
+dependency reports `prod`. Spot-check three findings against `bun pm ls --all` in the repo they
+came from.
+
+**Depends on.** Nothing. Cheaper and larger than v2.1; do it first.
+
+### v2.4 Informational advisories are not vulnerabilities
+
+**Why.** RUSTSEC publishes maintenance notices through the same channel as vulnerabilities.
+`derivative is unmaintained` is a real thing to know and it is not a thing to fix tonight, and
+douane currently prints it beside a memory-safety bug with the same weight. They also arrive
+with no severity and no patched version by construction, which is why they dominate both the
+UNKNOWN bucket and the no-fix bucket and make both look worse than they are.
+
+Measured: **77 of 141 crates.io findings are informational**, being 61 `unmaintained`, 16
+`unsound` and 0 `notice`. Only 64 crates findings are actual vulnerabilities, and only 2 of those
+have no fix, against the 64 that appeared to.
+
+The marker is at `affected[].database_specific.informational`, not top level. A top-level
+`database_specific` read finds only `{"license": "CC0-1.0"}`, which is how this was missed.
+
+**Prior art, and the reason not to just drop them.** cargo-audit separates the two: informational
+advisories are **warnings**, not vulnerabilities, and `cargo-audit/src/config.rs` defaults
+`informational_warnings` to all three kinds while `--deny unmaintained` escalates on request.
+That is the right shape. `unsound` in particular is often a genuine memory-safety hazard wearing
+an informational label, so silently discarding it would be a false negative dressed as a noise cut.
+
+**What.** Read the marker, carry it on the finding, rank informational below every rated
+vulnerability, and exclude it from `-fail` unless asked. `-informational warn|fail|ignore`,
+defaulting to `warn`. An informational advisory no longer raises a `GapSeverity`, because
+"no severity" is the correct and complete answer for it rather than something douane failed
+to determine.
+
+**Exit criterion.** `douane scan` on a Rust repo separates informational from vulnerabilities in
+the output, `-fail high` no longer trips on an unmaintained crate, `-informational fail` still
+trips, and the fleet severity gap count drops by 32, from 43 to 11.
+
+**Depends on.** Nothing. Overlaps v1.6: both are gaps that are not really gaps.
 
 ### v2.2 Severity for Go advisories, shipped 2026-08-23
 
@@ -246,8 +481,19 @@ previously read UNKNOWN.
 ## v3 — is it actually deployed?  *(promoted)*
 
 **Why.** A CVE in a repo last deployed in March is a chore. The same CVE in the container serving
-production is an incident. With KEV at zero and EPSS flat, this is the sharpest remaining axis —
-and nothing else in the stack can make the distinction.
+production is an incident. With KEV at zero for the third measurement, this is the sharpest
+remaining judgment axis, and nothing else in the stack can make the distinction.
+
+The v0.2 baseline handed this milestone its argument in one finding. `CVE-2023-45288` in the Go
+`stdlib` scores **0.9197 on EPSS**, the highest in the fleet by a factor of two and the only
+finding above 50%. It is in `backend-protobuf-poc`. Whether that is the most urgent thing douane
+has ever printed or entirely ignorable is decided by one fact douane does not have, and the same
+question applies to the other 15 findings above 5%.
+
+Note what this does to the earlier "EPSS is thin" conclusion: it was thin because the scan was
+missing the standard library. With that coverage in, EPSS separates 16 findings from 3800, which
+is exactly the job. It is a genuine prioritiser again, and it hands its top result straight to
+this milestone.
 
 **What.** `trivy image` (not grype — they overlap ~90%, pick one) against the images Dokploy
 reports as running on ruche, correlated back to findings. Trivy runs via `docker run` with a
@@ -291,7 +537,15 @@ threshold is "new since yesterday", never the standing total.
 **Exit criterion.** A quiet night produces no alert at all. A newly published advisory affecting
 a deployed service produces exactly one.
 
-**Depends on.** v1.2, v1.3, and enough of v1.4/v2.1/v3 that a nightly alert is readable.
+**Depends on.** v1.2, v1.3, and enough of v1.4/v2.3/v2.4/v3 that a nightly alert is readable.
+
+**Prerequisites on the host, measured 2026-08-28.** ruche has `~/.douane.db` and **no `douane`
+binary**, so the flow installs one. It has **no Go toolchain**, which also blocks v2.1 there. And
+it holds 30 repo directories against lucy's 65, so a nightly sweep on ruche as it stands would
+report a clean fleet while covering under half of it. That is the exact failure the exit criterion
+above cannot detect, since a repo that is absent produces no alert and a quiet night produces no
+alert. Add a coverage assertion: the flow fails loudly if it sweeps fewer repositories than the
+last run, rather than reporting silence.
 
 ### v5.2 The `/douane` skill
 
@@ -308,7 +562,68 @@ means, and the baseline says that is 18 findings, 16 of them the same one.
 honestly what it left behind and why.
 
 **Depends on.** v1.1 (it needs somewhere legitimate to defer a finding), v1.4 (the grouping it
-reports is better computed once, in the binary), and a stable JSON shape.
+reports is better computed once, in the binary), v1.6 (it keys on ids, and 14% of them do not
+resolve), and a stable JSON shape.
+
+### v5.3 The introduced-finding gate
+
+**Why.** The obvious next step after a working scanner is a hook or a CI job, and both are wrong
+today for different reasons.
+
+A git hook is wrong permanently. douane's answer is a function of the source tree **and today's
+date**. A hook fires on the one event that does not change the answer, your commit, and stays
+silent on the one that does, an advisory published overnight. That is the whole reason this is a
+separate binary from `filet` with a separate trigger, and it is why v5.1 is the real answer.
+
+CI is right eventually and wrong now. `-fail` is evaluated over the entire finding list
+(`shouldFail`, `internal/cli/history.go`), so it is a claim about the repo's **state**. Turned on
+today at `-fail high` it fails **57 of the 65 repos** on the first push, for findings nobody in
+that pull request introduced, which trains everyone to append `|| true` inside a week.
+The gate that would work asks a different question: did **this change** introduce a finding.
+
+douane cannot express that. `[NEW]` exists but comes from `st.PreviousKeys(report.Target)` against
+`~/.douane.db`, keyed on the local path. A CI runner is ephemeral, so the database is absent and
+every finding is new; a shared runner has one, but keyed wrongly. There is no committed baseline
+and no way to diff against a merge base.
+
+**What.** A baseline douane can be handed rather than one it must remember. `douane scan
+-baseline <file>` compares against a committed or artifact-stored finding set and `-fail` applies
+only to findings absent from it, with `-fail-total` keeping today's state-based behaviour for the
+nightly. The baseline is keyed on `Finding.Key()`, which already exists and is stable across
+runs, and it records the advisory ids so a key that no longer resolves is visible rather than
+silently unmatched.
+
+**Rollout, per repo, not fleet-wide.** Eight repos can adopt `-fail high` today with no baseline
+at all: the five that print zero lines (`ardoise-cli`, `authentik-config`, `croc`,
+`perception-js`, `portail`) and three more that have findings but none above medium. They prove
+the gate before it ever meets a repo with 227 findings. Everything else adopts a baseline first and shrinks it. Exit 3 is a retry in CI,
+never a block, because "I could not tell" is not "you are vulnerable".
+
+**Exit criterion.** A pull request that adds a vulnerable dependency fails. A pull request that
+touches one line of a README in a repo with 227 existing findings passes. Removing the baseline
+file fails the build rather than passing it, because a missing baseline must not read as an empty
+one.
+
+**Depends on.** v1.1, so a repo has a legitimate way to defer what it cannot fix. Ordered after
+v5.1: the nightly catches what a per-commit gate structurally cannot, so it is worth more and
+costs less.
+
+---
+
+## Housekeeping
+
+Not milestones. Small, known, and each one bites at a bad moment.
+
+- **No release script.** Every tag so far was cut by hand, which the suite versioning convention
+  warns against, and the version only exists in the tag because Go 1.24+ stamps it from VCS.
+  `scripts/release.sh`, modelled on muse.
+- **The install shim documents a fallback that no longer works.** `install.sh` still offers
+  `curl | bash install.sh <tool>`, which `facile` bootstrap now refuses by design. Drop the
+  fallback from the shim template or teach bootstrap to delegate. Same fix needed across every
+  repo carrying the shim, so fix the template.
+- **`~/.douane.db` on ruche is orphaned**, written by sweeps from a binary that is no longer
+  installed there. Either v5.1 adopts it or it should go, because a stale history file silently
+  changes what `[NEW]` means on the next run.
 
 ---
 
@@ -318,9 +633,13 @@ reports is better computed once, in the binary), and a stable JSON shape.
   zero differentiation. douane is a client over existing databases, always.
 - **Running trivy *and* grype.** ~90% overlap. Two scanners is a dedup problem, not twice the
   coverage.
-- **Gating CI on KEV.** `-fail kev` stays in the binary — it is the right gate in principle and
-  costs nothing — but a gate that has never fired on 732 findings is not a safety net, and must
-  not be sold as one.
+- **Gating CI on KEV.** `-fail kev` stays in the binary, it is the right gate in principle and
+  costs nothing, but a gate that has never fired across three measurements (732, 1965 and 3816
+  findings) is not a safety net and must not be sold as one.
+- **A pre-commit hook.** Not "later", not at all. See v5.3: the answer changes with the date, not
+  with the diff, so a commit-time trigger fires when nothing changed and is silent when everything
+  did. It also needs the network and 30 seconds. `lefthook.yml` in this repo is for developing
+  douane and is not a template for consumers.
 - **Putting a model in the binary.** Findings must be reproducible and the daemon must hold no API
   key. See v5.2.
 - **A letter grade.** findings-per-KLOC has no denominator for CVEs. filet already got burned by
@@ -336,11 +655,21 @@ reports is better computed once, in the binary), and a stable JSON shape.
 
 - **~~Blast radius~~ — settled 2026-08-19.** Client repos are in. GFConseil (122) and LauraHerve
   (92) are the two worst in the fleet; excluding them would hide 29% of the findings.
-- **Where the sweep runs.** ruche has the Dokploy API and the cron; lucy has the checkouts. The
-  baseline ran on ruche, so the checkouts are there too — but they are clones for scanning, not
-  the working copies, and nothing keeps them fresh. v5.1 needs an answer: a `git fetch` step in
-  the flow, or the sweep moves to lucy and reaches Dokploy over the network.
-- **Whether v4 obsoletes part of v1.** Still open. The baseline gave a denominator (230 unique
-  advisories) but not the overlap; `douane alerts` on one npm-heavy repo answers it cheaply.
-- **What EPSS threshold means anything here.** With two findings above 5% and a cliff below,
-  a fixed cutoff is arbitrary. Revisit once v3 says which of them are deployed.
+- **~~Where the sweep runs~~ — settled 2026-08-28, by measurement.** ruche holds 30 repo
+  directories, lucy holds 65, so ruche's clone set is not the fleet and nothing keeps it fresh.
+  Every number this roadmap quoted before v0.2 was taken on that partial set. The sweep runs where
+  the checkouts are complete, and the open work is reaching Dokploy from there rather than
+  reaching the code from ruche. Whichever host wins needs `douane` installed and, for v2.1, a Go
+  toolchain; ruche has neither today.
+- **Whether v4 obsoletes part of v1.** Still open. The v0.2 baseline gives a denominator of 463
+  unique advisories but not the overlap; `douane alerts` on one npm-heavy repo answers it cheaply.
+- **~~What EPSS threshold means anything here~~ — partly answered 2026-08-28.** The v0.1 cliff was
+  an artefact of missing stdlib coverage. The real distribution is 1 finding above 50%, 14 above
+  10%, 16 above 5% and 101 above 1%, out of 3816. **5% separates 16 findings from the fleet and is
+  worth acting on**; anything below 1% is indistinguishable from zero and should not be ranked as
+  if it were signal. What remains open is whether the threshold gates anything, which waits on v3.
+- **Whether informational and dev-only findings should count toward the zero-lines target.**
+  v2.3 and v2.4 together demote roughly 600 findings without fixing a single one. That is a real
+  noise cut and it is also the exact move that lets a tool declare victory by redefining the
+  question. The target should probably be restated as zero **prod-scope, non-informational**
+  lines, stated once and not moved again. Decide when v2.3 lands, not after the number looks good.
