@@ -3,6 +3,8 @@ package output
 import (
 	"fmt"
 	"io"
+
+	"github.com/FacileStudio/douane/internal/finding"
 )
 
 // tally is what the closing line of a fleet run counts: the repositories that
@@ -14,16 +16,24 @@ type tally struct{ clear, failed, incomplete int }
 type fleetTotals struct{ held, packages, kev int }
 
 // writeSweepSummary closes a fleet run: one row per repository holding
-// findings, then the totals. fixes is the grouped view's action count, zero in
+// findings, then the totals. n is the grouped view's action count, zero in
 // flat mode.
-func writeSweepSummary(w io.Writer, st style, s Sweep, t fleetTotals, fixes int) {
+func writeSweepSummary(w io.Writer, st style, gl glyphs, s Sweep, t fleetTotals, n int) {
 	tally := writeRepoRows(w, st, s.Repos)
-	fmt.Fprintf(w, "\n%d held out of %d packages across %d repos",
-		t.held, t.packages, len(s.Repos))
-	if fixes > 0 {
-		fmt.Fprintf(w, " in %d fix%s", fixes, plural(fixes))
+	sep := " " + st.dim(gl.Sep) + " "
+	scope := fmt.Sprintf("%d held", t.held) + sep +
+		st.dim(fmt.Sprintf("%d packages", t.packages)) + sep +
+		st.dim(fmt.Sprintf("%d repos", len(s.Repos)))
+	if n > 0 {
+		scope += sep + st.dim(fmt.Sprintf("%d %s", n, fixes(n)))
 	}
-	writeSweepTail(w, st, t.kev, tally)
+	fmt.Fprintf(w, "\n  %s\n", scope)
+	var all []finding.Finding
+	for _, r := range s.Repos {
+		all = append(all, r.Findings...)
+	}
+	fmt.Fprintf(w, "  %s", spread(st, gl, all))
+	writeSweepTail(w, st, gl, tally)
 }
 
 func writeRepoRows(w io.Writer, st style, repos []Report) tally {
@@ -41,7 +51,8 @@ func writeRepoRows(w io.Writer, st style, repos []Report) tally {
 			continue
 		}
 		fmt.Fprintf(w, "  %s  %s\n", st.bold(fmt.Sprintf("%-*s", width, r.Name)),
-			st.dim(fmt.Sprintf("%6d findings  %6d packages", len(r.Findings), r.Packages)))
+			st.dim(fmt.Sprintf("%6d finding%s  %6d packages",
+				len(r.Findings), plural(len(r.Findings)), r.Packages)))
 	}
 	return t
 }
@@ -56,18 +67,19 @@ func nameWidth(repos []Report) int {
 	return width
 }
 
-func writeSweepTail(w io.Writer, st style, kev int, t tally) {
+// writeSweepTail closes the spread line with what happened to the repos that
+// hold no findings, which the severity counts cannot say: clear, unreadable,
+// or only partly determined.
+func writeSweepTail(w io.Writer, st style, gl glyphs, t tally) {
+	sep := " " + st.dim(gl.Sep) + " "
 	if t.clear > 0 {
-		fmt.Fprintf(w, " — %s", st.fix(fmt.Sprintf("%d clear", t.clear)))
-	}
-	if kev > 0 {
-		fmt.Fprintf(w, " — %s", st.alarm(fmt.Sprintf("%d known exploited", kev)))
+		fmt.Fprintf(w, "%s%s", sep, st.fix(fmt.Sprintf("%d clear", t.clear)))
 	}
 	if t.failed > 0 {
-		fmt.Fprintf(w, " — %s", st.warn(fmt.Sprintf("%d could not be read", t.failed)))
+		fmt.Fprintf(w, "%s%s", sep, st.warn(fmt.Sprintf("%d could not be read", t.failed)))
 	}
 	if t.incomplete > 0 {
-		fmt.Fprintf(w, " — %s", st.warn(fmt.Sprintf("%d incomplete", t.incomplete)))
+		fmt.Fprintf(w, "%s%s", sep, st.warn(fmt.Sprintf("%d incomplete", t.incomplete)))
 	}
 	fmt.Fprintln(w)
 }

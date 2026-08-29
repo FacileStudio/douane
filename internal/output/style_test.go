@@ -31,8 +31,8 @@ func TestColorChangesOnlyEscapeBytes(t *testing.T) {
 		name  string
 		write func(*bytes.Buffer, style)
 	}{
-		{"finding", func(b *bytes.Buffer, st style) { writeFinding(b, st, f, true) }},
-		{"group", func(b *bytes.Buffer, st style) { writeGroup(b, st, g) }},
+		{"finding", func(b *bytes.Buffer, st style) { writeFinding(b, st, unicodeGlyphs, f, true) }},
+		{"group", func(b *bytes.Buffer, st style) { writeGroup(b, st, unicodeGlyphs, g) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var plain, painted bytes.Buffer

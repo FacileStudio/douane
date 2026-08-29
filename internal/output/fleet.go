@@ -34,7 +34,7 @@ func sweepFixLines(w io.Writer, s Sweep) error {
 }
 
 func writeSweepText(w io.Writer, s Sweep, l Layout) error {
-	st := newStyle(w)
+	st, gl := newStyle(w), glyphsFor(w)
 	writeNotesText(w, st, s.Gaps, s.Warnings)
 	t := totalsOf(s)
 	if t.held == 0 && !anyNote(s) {
@@ -43,36 +43,36 @@ func writeSweepText(w io.Writer, s Sweep, l Layout) error {
 		return nil
 	}
 	if l == LayoutFix && t.held > 0 {
-		writeSweepFixText(w, st, s, t)
+		writeSweepFixText(w, st, gl, s, t)
 		return nil
 	}
-	writeSweepRepoText(w, st, s)
+	writeSweepRepoText(w, st, gl, s)
 	return nil
 }
 
-func writeSweepFixText(w io.Writer, st style, s Sweep, t fleetTotals) {
+func writeSweepFixText(w io.Writer, st style, gl glyphs, s Sweep, t fleetTotals) {
 	groups := fleetGroups(s)
 	verb := "clear"
 	if len(groups) == 1 {
 		verb = "clears"
 	}
-	fmt.Fprintf(w, "%d findings across %d repos, %d fix%s %s them\n\n",
-		t.held, repoCount(s), len(groups), plural(len(groups)), verb)
+	fmt.Fprintf(w, "%d findings across %d repos, %d %s %s them\n\n",
+		t.held, repoCount(s), len(groups), fixes(len(groups)), verb)
 	for _, g := range groups {
-		writeGroup(w, st, g)
+		writeGroup(w, st, gl, g)
 	}
 	writeRepoNotes(w, st, s)
-	writeSweepSummary(w, st, s, t, len(groups))
+	writeSweepSummary(w, st, gl, s, t, len(groups))
 }
 
-func writeSweepRepoText(w io.Writer, st style, s Sweep) {
+func writeSweepRepoText(w io.Writer, st style, gl glyphs, s Sweep) {
 	for _, r := range s.Repos {
 		if len(r.Findings) == 0 && len(r.Warnings) == 0 && len(r.Gaps) == 0 {
 			continue
 		}
-		writeRepo(w, st, r)
+		writeRepo(w, st, gl, r)
 	}
-	writeSweepSummary(w, st, s, totalsOf(s), 0)
+	writeSweepSummary(w, st, gl, s, totalsOf(s), 0)
 }
 
 // fleetGroups groups every finding in the run by the fix that clears it,
@@ -105,11 +105,11 @@ func writeRepoNotes(w io.Writer, st style, s Sweep) {
 		writeNotesText(w, st, r.Gaps, r.Warnings)
 	}
 }
-func writeRepo(w io.Writer, st style, r Report) {
+func writeRepo(w io.Writer, st style, gl glyphs, r Report) {
 	fmt.Fprintf(w, "%s — %d held out of %d packages\n\n",
 		st.bold(r.Name), len(r.Findings), r.Packages)
 	writeNotesText(w, st, r.Gaps, r.Warnings)
 	for _, f := range r.Findings {
-		writeFinding(w, st, f, r.New[f.Key()])
+		writeFinding(w, st, gl, f, r.New[f.Key()])
 	}
 }

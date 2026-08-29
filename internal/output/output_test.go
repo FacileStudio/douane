@@ -111,7 +111,9 @@ func TestTextByFixCollapsesRepeatedBumps(t *testing.T) {
 	if got := strings.Count(stdout, "chi"); got != 1 {
 		t.Fatalf("text names chi %d times, want one action block:\n%s", got, stdout)
 	}
-	for _, want := range []string{"2 findings", "4.11.0, 5.0.0 → 5.0.12", "in 1 fix"} {
+	// A buffer is not a terminal and declares no locale, so it renders with the
+	// ASCII glyph set: "->", not "→". Same rule as filet.
+	for _, want := range []string{"2 findings", "4.11.0, 5.0.0 -> 5.0.12", "1 fix", "2 high"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("text = %q, want it to carry %q", stdout, want)
 		}

@@ -110,29 +110,45 @@ by what predicts real harm:
 An empty `fixed_in` means **no fix exists on your branch**, which is a different decision
 from a fix you have not taken yet. douane never conflates the two.
 
-### Colour follows the ranking, not the severity
+### Severity is a ramp, not an alarm
 
-The same argument applies to colour, so severity is **not** what lights up. 91% of a real fleet
-sweep is high or medium; painting those red reproduces in colour the exact failure the ranking
-exists to avoid, and a screen that is entirely red ranks nothing.
+```
+◆ CRITICAL  Go:stdlib 1.26.0 → 1.26.6
+    ↳ failure to reject ASCII-only Punycode-encoded labels in x/net/idna
+      8 findings · epss — · 1 target: apps/api/go.mod
+      CVE-2026-33818, CVE-2026-39821, CVE-2026-46600 +5
 
-What is coloured:
+  3838 held · 19848 packages · 65 repos · 316 fixes
+  136 critical · 1632 high · 1707 medium · 218 low · 145 unknown · 5 clear
+```
+
+The same argument that shapes the ranking shapes the palette. A real fleet is 136 critical
+against 1632 high and 1707 medium, so a scheme where high and medium are both hot paints 87%
+of the report in warning colours and ranks nothing. Severity runs **red, amber, blue, grey**,
+and the hue rides the `◆` mark and the severity word rather than the whole line, so the block
+stays readable at 300 groups.
 
 | | |
 |---|---|
-| red | `KEV`, `RANSOMWARE`, the known-exploited count |
-| yellow | `NEW`, `NO FIX`, EPSS at or above 5%, gaps and warnings |
-| green | the version that clears the finding, and `clear` |
-| bold | the severity word, the package name, the repository name |
-| dim | advisory ids, targets, ecosystems, prose |
+| severity ramp | `◆` and the severity word: red critical, amber high, blue medium, grey below |
+| red | `KEV`, `RANSOMWARE` |
+| amber | `NEW`, `NO FIX`, EPSS at or above 5%, gaps and warnings |
+| green | the version that clears the finding, `clear` |
+| bold | the package name, the repository name |
+| dim | advisory ids, targets, ecosystems, prose, separators |
 
-So a healthy sweep is monochrome, and anything hot is worth the look.
+The closing pair is the point of the whole report: what was measured, then the shape of what
+was found. `3838 held` is a number; the spread underneath is what decides whether you open it
+tonight.
 
 Colour is on when the destination is a terminal and off otherwise, the same signal `-format
-auto` already uses. `NO_COLOR=1` or `TERM=dumb` turns it off. **`line` and `json` are never
-coloured, even on a terminal**, because they are the formats a pipe and an agent consume. The
-decision is made per stream, so `douane sweep > report.txt` still colours the gaps on your
-terminal while leaving the file plain.
+auto` already uses. `NO_COLOR=1` or `TERM=dumb` turns it off. Glyphs degrade to `>`, `->` and
+`|` when the environment never declared a UTF-8 locale, because a mojibake diamond is worse
+than a plain one.
+
+**`line` and `json` are never coloured, even on a terminal**, since they are the formats a pipe
+and an agent consume. The decision is made per stream, so `douane sweep > report.txt` still
+colours the gaps on your terminal while leaving the file plain.
 
 ## Ecosystems
 

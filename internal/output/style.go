@@ -3,6 +3,8 @@ package output
 import (
 	"io"
 	"os"
+
+	"github.com/FacileStudio/douane/internal/finding"
 )
 
 const (
@@ -12,6 +14,9 @@ const (
 	ansiRed    = "\033[31m"
 	ansiGreen  = "\033[32m"
 	ansiYellow = "\033[33m"
+	ansiBlue   = "\033[34m"
+	ansiCyan   = "\033[36m"
+	ansiGrey   = "\033[90m"
 )
 
 // epssNotable is where exploit probability stops being noise. Measured over
@@ -67,11 +72,16 @@ func (s style) bold(text string) string { return s.paint(ansiBold, text) }
 // whole report exists to name.
 func (s style) fix(text string) string { return s.paint(ansiGreen, text) }
 
-// alarm is reserved for what douane's own ranking calls exceptional: a KEV hit
-// or ransomware. Severity is deliberately excluded. 91% of the fleet is high
-// or medium, so painting severity red reproduces in colour the exact failure
-// the ranking exists to avoid, and a screen that is entirely red ranks nothing.
+// alarm is what douane's own ranking calls exceptional: a KEV hit or
+// ransomware. Severity gets its own ramp in severityColour, which reaches red
+// only at critical, so red keeps meaning red in both places.
 func (s style) alarm(text string) string { return s.paint(ansiRed, text) }
+
+// mark paints a severity glyph. Hue rides the mark rather than the whole line,
+// so severity stays scannable without 3400 findings' worth of coloured prose.
+func (s style) mark(sev finding.Severity, text string) string {
+	return s.paint(severityColour(sev), text)
+}
 
 // warn carries the second tier: new since the last run, no fix available, and
 // an exploit probability above epssNotable.
