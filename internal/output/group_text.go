@@ -21,39 +21,34 @@ func capAt(ss []string, n int) string {
 // writeGroup renders one action: every finding cleared by taking one package
 // to one target version. The worst member speaks for the group's rank; its
 // summary is the only prose a decision needs.
-func writeGroup(w io.Writer, g finding.Group) {
+func writeGroup(w io.Writer, st style, g finding.Group) {
 	worst := g.WorstFinding()
-	action := g.Package
+	action := st.bold(g.Package)
 	if len(g.Installed) > 0 {
 		action += " " + capAt(g.Installed, 3)
 	}
 	if g.FixedIn == "" {
-		action += " → no fix"
+		action += " → " + st.warn("no fix")
 	} else {
-		action += " → " + g.FixedIn
+		action += " → " + st.fix(g.FixedIn)
 	}
-	fmt.Fprintf(w, "%-9s %d finding%s · %s · %s%s\n",
-		g.Worst, g.Count, plural(g.Count), g.Ecosystem, action,
-		badge(worst, g.New > 0))
-	writeGroupDetail(w, g, worst)
+	fmt.Fprintf(w, "%s %d finding%s · %s · %s%s\n",
+		st.bold(fmt.Sprintf("%-9s", g.Worst)), g.Count, plural(g.Count),
+		st.dim(g.Ecosystem), action, badge(st, worst, g.New > 0))
+	writeGroupDetail(w, st, g, worst)
 	if worst.Summary != "" {
-		fmt.Fprintf(w, "          worst: %s\n", worst.Summary)
+		fmt.Fprintf(w, "          %s\n", st.dim("worst: "+worst.Summary))
 	}
 	fmt.Fprintln(w)
 }
 
 // writeGroupDetail carries the advisory ids, exploit likelihood and affected
 // targets under the headline, capped so a fleet-wide package stays one block.
-func writeGroupDetail(w io.Writer, g finding.Group, worst finding.Finding) {
-	detail := capAt(g.IDs, 3)
-	if !worst.Exploit.EPSSKnown {
-		detail += " · epss —"
-	} else {
-		detail += fmt.Sprintf(" · epss %.2f%%", worst.Exploit.EPSS*100)
-	}
-	detail += fmt.Sprintf(" · %d target%s: %s", len(g.Targets), plural(len(g.Targets)),
+func writeGroupDetail(w io.Writer, st style, g finding.Group, worst finding.Finding) {
+	tail := fmt.Sprintf(" · %d target%s: %s", len(g.Targets), plural(len(g.Targets)),
 		capAt(g.Targets, 5))
-	fmt.Fprintf(w, "          %s\n", detail)
+	fmt.Fprintf(w, "          %s · %s%s\n",
+		st.dim(capAt(g.IDs, 3)), epssLabel(st, worst), st.dim(tail))
 }
 
 func plural(n int) string {

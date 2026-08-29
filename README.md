@@ -110,6 +110,30 @@ by what predicts real harm:
 An empty `fixed_in` means **no fix exists on your branch**, which is a different decision
 from a fix you have not taken yet. douane never conflates the two.
 
+### Colour follows the ranking, not the severity
+
+The same argument applies to colour, so severity is **not** what lights up. 91% of a real fleet
+sweep is high or medium; painting those red reproduces in colour the exact failure the ranking
+exists to avoid, and a screen that is entirely red ranks nothing.
+
+What is coloured:
+
+| | |
+|---|---|
+| red | `KEV`, `RANSOMWARE`, the known-exploited count |
+| yellow | `NEW`, `NO FIX`, EPSS at or above 5%, gaps and warnings |
+| green | the version that clears the finding, and `clear` |
+| bold | the severity word, the package name, the repository name |
+| dim | advisory ids, targets, ecosystems, prose |
+
+So a healthy sweep is monochrome, and anything hot is worth the look.
+
+Colour is on when the destination is a terminal and off otherwise, the same signal `-format
+auto` already uses. `NO_COLOR=1` or `TERM=dumb` turns it off. **`line` and `json` are never
+coloured, even on a terminal**, because they are the formats a pipe and an agent consume. The
+decision is made per stream, so `douane sweep > report.txt` still colours the gaps on your
+terminal while leaving the file plain.
+
 ## Ecosystems
 
 | Lockfile | Ecosystem |
