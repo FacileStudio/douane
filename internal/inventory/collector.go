@@ -14,12 +14,11 @@ const binaryBunLock = "bun.lockb"
 const binaryBunLockDetail = "binary bun lockfile is unreadable, run `bun install --save-text-lockfile` to emit bun.lock"
 
 type collector struct {
+	gapSet
 	root   string
 	seen   map[string]bool
-	noted  map[string]bool
 	parsed map[string]bool
 	pkgs   []finding.Package
-	gaps   []finding.Gap
 }
 
 // visit records a per-file failure and keeps walking. Only the root itself is
@@ -110,13 +109,4 @@ func dropped(pkg finding.Package) string {
 		return fmt.Sprintf("dropped an entry with no package name at version %q", pkg.Version)
 	}
 	return "dropped " + pkg.Name + " with no version"
-}
-
-func (c *collector) gap(kind finding.GapKind, subject, detail string) {
-	key := string(kind) + "|" + subject + "|" + detail
-	if c.noted[key] {
-		return
-	}
-	c.noted[key] = true
-	c.gaps = append(c.gaps, finding.Gap{Kind: kind, Subject: subject, Detail: detail})
 }

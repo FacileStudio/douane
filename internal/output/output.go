@@ -58,6 +58,12 @@ type Report struct {
 	New      map[string]bool   `json:"-"`
 	Gaps     []finding.Gap     `json:"gaps,omitempty"`
 	Warnings []string          `json:"warnings,omitempty"`
+
+	// BuildLines maps a module's lockfile path to the release line its
+	// Dockerfile builds it with. It lives on the report rather than on every
+	// finding because it is a property of a module: one repo carried it on 121
+	// findings for three modules.
+	BuildLines map[string]string `json:"build_lines,omitempty"`
 }
 
 // Complete reports whether douane determined everything it set out to. An
@@ -99,7 +105,7 @@ func writeLines(w io.Writer, prefix string, r Report, l Layout) error {
 	if l == LayoutFinding {
 		return writeFlatLines(w, prefix, r)
 	}
-	for _, g := range finding.Groups(r.Findings, isNewFn(r)) {
+	for _, g := range finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r)) {
 		fix := g.FixedIn
 		if fix == "" {
 			fix = "no-fix"

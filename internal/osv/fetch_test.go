@@ -114,6 +114,52 @@ func TestFetchGapsAnAdvisoryItCouldNotRead(t *testing.T) {
 	}
 }
 
+// Some records name a GHSA twin OSV has no record for. The preferred fetch
+// 404s, and a round that came back empty used to end the walk before the CVE
+// twin holding the vector was ever asked for.
+func TestFetchKeepsChasingWhenThePreferredTwinIsMissing(t *testing.T) {
+	goRec := Vuln{ID: "GO-2026-5841", Aliases: []string{"GHSA-259r-337f-4rfw", "CVE-2026-3"}}
+	cve := Vuln{ID: "CVE-2026-3", Aliases: []string{"GO-2026-5841"}}
+	cve.Severity = osvScore("CVSS_V3", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H")
+	c, _ := osvVulnServer(t, map[string]Vuln{goRec.ID: goRec, cve.ID: cve})
+	out, gaps, err := c.Fetch(context.Background(), []string{goRec.ID})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %v, want none, the CVE twin rates the closure", gaps)
+	}
+	if sev, _ := Severity(out[goRec.ID]); sev != finding.SevHigh {
+		t.Fatalf("severity = %v, want HIGH from the CVE twin behind the missing GHSA", sev)
+	}
+	if id, _ := Canonical(out[goRec.ID], c.absent); id != "CVE-2026-3" {
+		t.Fatalf("canonical = %q, want the CVE, which was never proven absent", id)
+	}
+}
+
+// CVE-2024-24788 was retracted on 2025-02-28 and still answered a package
+// query, so a record OSV itself no longer stands behind reached the report,
+// the store's history and the exit code.
+func TestFetchDropsAWithdrawnRecord(t *testing.T) {
+	live := Vuln{ID: "CVE-2026-1", DatabaseSpecific: DatabaseSpecific{Severity: "LOW"}}
+	gone := Vuln{ID: "CVE-2024-24788", Withdrawn: "2025-02-28T06:48:26.677625Z"}
+	gone.DatabaseSpecific = DatabaseSpecific{Severity: "HIGH"}
+	c, _ := osvVulnServer(t, map[string]Vuln{live.ID: live, gone.ID: gone})
+	out, gaps, err := c.Fetch(context.Background(), []string{live.ID, gone.ID})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if _, ok := out[gone.ID]; ok {
+		t.Fatal("a withdrawn advisory must not survive the fetch to become a finding")
+	}
+	if len(out) != 1 {
+		t.Fatalf("out = %v, want only the live record", out)
+	}
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %v, want none, a retraction is an answer and not a hole", gaps)
+	}
+}
+
 // The GHSA twin is the one that carries a label, so a closure it settles must
 // not also cost a request for the CVE twin that would add nothing.
 func TestFetchTriesTheLabelledTwinFirst(t *testing.T) {

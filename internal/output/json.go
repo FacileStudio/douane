@@ -55,7 +55,7 @@ func reportBody(r Report) reportJSON {
 	for _, f := range r.Findings {
 		fs = append(fs, findingJSON{Finding: f, Key: f.Key(), New: r.New[f.Key()]})
 	}
-	groups := finding.Groups(r.Findings, func(f finding.Finding) bool { return r.New[f.Key()] })
+	groups := finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r))
 	if groups == nil {
 		groups = []finding.Group{}
 	}

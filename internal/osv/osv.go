@@ -20,10 +20,16 @@ const (
 
 // Client queries the OSV.dev database. The zero value is not usable; call New.
 type Client struct {
-	http *httpx.Client
-	base string
-	vuln string
+	http   *httpx.Client
+	base   string
+	vuln   string
+	absent map[string]bool
 }
+
+// Absent reports the ids douane asked OSV for and was told do not exist. It is
+// the difference between "we never looked" and "it is not there", which is the
+// only basis on which an identifier may be refused the primary slot.
+func (c *Client) Absent() map[string]bool { return c.absent }
 
 // New returns a Client pointed at the public OSV.dev API.
 func New() *Client {

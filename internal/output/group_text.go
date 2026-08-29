@@ -30,12 +30,28 @@ func writeGroup(w io.Writer, th theme, g finding.Group) {
 	fmt.Fprintf(w, "%s %s  %s%s %s%s%s\n",
 		th.mark(g.Worst, th.Mark), th.mark(g.Worst, pad(g.Worst.String(), 8)),
 		th.dim(g.Ecosystem+":"), th.bold(g.Package),
-		th.dim(capAt(g.Installed, 3)), arrow, badge(th, worst, g.New > 0))
+		th.dim(capAt(g.Installed, 3)), arrow, groupBadge(th, g, worst))
 	if worst.Summary != "" {
 		fmt.Fprintf(w, "    %s %s\n", th.dim(th.Arrow), th.dim(worst.Summary))
 	}
 	writeGroupDetail(w, th, g, worst)
 	fmt.Fprintln(w)
+}
+
+// groupBadge adds the rebuild marker to a finding's own flags. It is green
+// rather than amber because it is the cheapest outcome on the report: the fix
+// is already on the line the image builds from, so a fresh build carries it
+// with no source change. It is a label and never a suppression, since douane
+// cannot see when the image was last built.
+func groupBadge(th theme, g finding.Group, worst finding.Finding) string {
+	flags := badge(th, worst, g.New > 0)
+	if !g.Rebuild {
+		return flags
+	}
+	if flags == "" {
+		return "  [" + th.fix("REBUILD") + "]"
+	}
+	return flags[:len(flags)-1] + " " + th.fix("REBUILD") + "]"
 }
 
 // writeGroupDetail carries the advisory ids, exploit likelihood and affected

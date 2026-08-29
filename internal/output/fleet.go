@@ -79,18 +79,22 @@ func writeSweepRepoText(w io.Writer, th theme, s Sweep) {
 // attributing each to its repository name rather than the lockfile path a
 // single scan would show.
 func fleetGroups(s Sweep) []finding.Group {
-	newSet := map[string]bool{}
+	newSet, rebuilt := map[string]bool{}, map[string]bool{}
 	var fs []finding.Finding
 	for _, r := range s.Repos {
 		for k := range r.New {
 			newSet[k] = true
 		}
 		for _, f := range r.Findings {
+			if isRebuild(r, f) {
+				rebuilt[f.Key()] = true
+			}
 			f.Target = r.Name
 			fs = append(fs, f)
 		}
 	}
-	return finding.Groups(fs, func(f finding.Finding) bool { return newSet[f.Key()] })
+	return finding.Groups(fs, func(f finding.Finding) bool { return newSet[f.Key()] },
+		func(f finding.Finding) bool { return rebuilt[f.Key()] })
 }
 
 // writeRepoNotes keeps the grouped view honest: a fix can collapse the

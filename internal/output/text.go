@@ -21,7 +21,7 @@ func writeText(w io.Writer, r Report, l Layout) error {
 		writeSummary(w, th, r, 0)
 		return nil
 	}
-	groups := finding.Groups(r.Findings, isNewFn(r))
+	groups := finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r))
 	for _, g := range groups {
 		writeGroup(w, th, g)
 	}

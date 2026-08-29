@@ -38,16 +38,13 @@ func (c *Client) hydrate(ctx context.Context, held map[string]Vuln, want []strin
 			tried[id] = true
 		}
 		more, _ := c.fetchSet(ctx, missing)
-		if len(more) == 0 {
-			break
-		}
 		maps.Copy(held, more)
 	}
 	for _, group := range closures(held) {
 		label, score := closureSeverity(held, group)
 		stamp(held, group, label, score)
 	}
-	return severityGaps(held, want)
+	return severityGaps(held, want, c.absent)
 }
 
 // unresolvedMembers lists the closure members worth fetching: those in a
@@ -70,6 +67,12 @@ func unresolvedMembers(held map[string]Vuln, tried map[string]bool) []string {
 // against the live API they settle 113 closures in 120, so pulling the CVE twin
 // in the same round would be a request that changes nothing. The rest wait for
 // the next round, which only happens for a closure the GHSA did not settle.
+//
+// A round that fetched nothing at all still has to hand over to the next one.
+// Some records name a GHSA twin OSV has no record for, so the preferred fetch
+// 404s and comes back empty; treating that as the end of the walk stranded the
+// CVE twin that would have rated the closure, and left 8 of the fleet's 43
+// severity gaps sitting on a record whose rating was one request away.
 func missingFrom(held map[string]Vuln, tried map[string]bool, group []string) []string {
 	var preferred, rest []string
 	for _, id := range group {
@@ -150,7 +153,7 @@ func stamp(held map[string]Vuln, group []string, label string, score SeveritySco
 // severityGaps reports the requested advisories no member of their closure
 // could rate. An unrated finding sits below every -fail threshold, so without
 // this the CI gate passes over it in silence.
-func severityGaps(held map[string]Vuln, want []string) []finding.Gap {
+func severityGaps(held map[string]Vuln, want []string, absent map[string]bool) []finding.Gap {
 	var gaps []finding.Gap
 	for _, id := range want {
 		v, ok := held[id]
@@ -160,7 +163,7 @@ func severityGaps(held map[string]Vuln, want []string) []finding.Gap {
 		if sev, _ := Severity(v); sev != finding.SevUnknown {
 			continue
 		}
-		canonical, _ := Canonical(v)
+		canonical, _ := Canonical(v, absent)
 		gaps = append(gaps, finding.Gap{
 			Kind:    finding.GapSeverity,
 			Subject: canonical,

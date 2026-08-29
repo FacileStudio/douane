@@ -17,6 +17,7 @@ type Group struct {
 	IDs       []string `json:"ids"`
 	Targets   []string `json:"targets"`
 	Installed []string `json:"installed"`
+	Rebuild   bool     `json:"rebuild,omitempty"`
 
 	worst Finding
 }
@@ -30,21 +31,36 @@ func (g Group) WorstFinding() Finding { return g.worst }
 // fixKey is the action a finding belongs to: the same package taken to the
 // same target version is one decision no matter how many advisories or
 // installed versions feed it. An empty FixedIn is its own key per package,
-// because "no fix exists" is one decision too — watch this package.
-func fixKey(f Finding) string { return f.Ecosystem + "|" + f.Package + "|" + f.FixedIn }
+// because "no fix exists" is one decision too: watch this package.
+//
+// rebuild is part of the key because it is part of the decision. One repo put
+// 46 findings cleared by rebuilding an image and 29 needing a real version bump
+// in the same group, and a group is labelled by what clears it, so labelling
+// that one either way hides half of it.
+func fixKey(f Finding, rebuild bool) string {
+	key := f.Ecosystem + "|" + f.Package + "|" + f.FixedIn
+	if rebuild {
+		return key + "|rebuild"
+	}
+	return key
+}
 
 // Groups collapses findings into one Group per (ecosystem, package, target
-// version), ordered worst first by the same rank that orders findings. isNew
-// reports whether a finding is being seen for the first time; nil treats every
-// finding as known.
-func Groups(fs []Finding, isNew func(Finding) bool) []Group {
+// version), then folds targets that share a release line together, ordered
+// worst first by the same rank that orders findings. isNew reports whether a
+// finding is being seen for the first time; rebuilt whether rebuilding the
+// artifact already clears it. Either may be nil, which answers no for every
+// finding.
+func Groups(fs []Finding, isNew, rebuilt func(Finding) bool) []Group {
 	byKey := map[string]*Group{}
 	var keys []string
 	for _, f := range fs {
-		k := fixKey(f)
+		rebuild := rebuilt != nil && rebuilt(f)
+		k := fixKey(f, rebuild)
 		g := byKey[k]
 		if g == nil {
-			g = &Group{Ecosystem: f.Ecosystem, Package: f.Package, FixedIn: f.FixedIn}
+			g = &Group{Ecosystem: f.Ecosystem, Package: f.Package,
+				FixedIn: f.FixedIn, Rebuild: rebuild}
 			byKey[k] = g
 			keys = append(keys, k)
 		}
@@ -54,6 +70,7 @@ func Groups(fs []Finding, isNew func(Finding) bool) []Group {
 	for _, k := range keys {
 		out = append(out, byKey[k].finalized())
 	}
+	out = mergeLines(out)
 	orderGroups(out)
 	return out
 }
@@ -80,7 +97,7 @@ func orderGroups(out []Group) {
 		case Less(out[j].worst, out[i].worst):
 			return false
 		default:
-			return fixKey(out[i].worst) < fixKey(out[j].worst)
+			return fixKey(out[i].worst, out[i].Rebuild) < fixKey(out[j].worst, out[j].Rebuild)
 		}
 	})
 }

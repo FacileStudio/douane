@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/httpx"
 )
 
 type fetchResult struct {
@@ -45,17 +46,39 @@ func (c *Client) Fetch(ctx context.Context, ids []string) (map[string]Vuln, []fi
 	return out, gaps, errors.Join(errs...)
 }
 
+// fetchSet splits a set of ids into the records that arrived and the errors
+// that did not. A withdrawn record is neither: it is dropped here, at the one
+// choke point every fetch passes through, so a retracted advisory can neither
+// become a finding nor lend its severity to a closure. Dropping it later, at
+// render time, would be too late: by then it has already keyed the store's
+// history and moved the exit code.
 func (c *Client) fetchSet(ctx context.Context, ids []string) (map[string]Vuln, map[string]error) {
 	out := make(map[string]Vuln, len(ids))
 	failed := map[string]error{}
 	for r := range c.fetchAll(ctx, ids) {
-		if r.err != nil {
+		switch {
+		case r.err != nil:
 			failed[r.id] = r.err
-			continue
+			c.noteAbsent(r.id, r.err)
+		case r.vuln.Withdrawn == "":
+			out[r.id] = r.vuln
 		}
-		out[r.id] = r.vuln
 	}
 	return out, failed
+}
+
+// noteAbsent records an id OSV answered 404 for. Only a 404 counts: a timeout
+// or a 500 means douane could not tell, and treating "could not tell" as "does
+// not exist" is how a transient outage would quietly rename findings.
+func (c *Client) noteAbsent(id string, err error) {
+	var se *httpx.StatusError
+	if !errors.As(err, &se) || se.Code != http.StatusNotFound {
+		return
+	}
+	if c.absent == nil {
+		c.absent = map[string]bool{}
+	}
+	c.absent[id] = true
 }
 
 // fetchAll runs the fetches over a fixed pool. The workers deliberately do not

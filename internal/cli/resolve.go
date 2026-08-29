@@ -23,8 +23,9 @@ func resolve(ctx context.Context, pkgs []finding.Package, report *output.Report)
 		flat = append(flat, list...)
 	}
 	vulns, fetchGaps, _ := client.Fetch(ctx, flat)
+	absent := client.Absent()
 	report.Gaps = append(report.Gaps, fetchGaps...)
-	findings, rangeGaps := build(pkgs, ids, vulns)
+	findings, rangeGaps := build(pkgs, ids, vulns, absent)
 	report.Findings = findings
 	report.Gaps = append(report.Gaps, rangeGaps...)
 }
@@ -33,7 +34,7 @@ func resolve(ctx context.Context, pkgs []finding.Package, report *output.Report)
 // as far as the resolution reaches: a failed query answers for fewer packages
 // than it was asked about, and reading past what came back is how a partial
 // answer turns into a panic.
-func build(pkgs []finding.Package, ids [][]string, vulns map[string]osv.Vuln) ([]finding.Finding, []finding.Gap) {
+func build(pkgs []finding.Package, ids [][]string, vulns map[string]osv.Vuln, absent map[string]bool) ([]finding.Finding, []finding.Gap) {
 	var out []finding.Finding
 	var gaps []finding.Gap
 	seen := map[string]bool{}
@@ -43,7 +44,7 @@ func build(pkgs []finding.Package, ids [][]string, vulns map[string]osv.Vuln) ([
 			if !ok {
 				continue
 			}
-			f := newFinding(v, pkg)
+			f := newFinding(v, pkg, absent)
 			if seen[f.Key()] {
 				continue
 			}
@@ -55,8 +56,8 @@ func build(pkgs []finding.Package, ids [][]string, vulns map[string]osv.Vuln) ([
 	return out, gaps
 }
 
-func newFinding(v osv.Vuln, pkg finding.Package) finding.Finding {
-	canonical, aliases := osv.Canonical(v)
+func newFinding(v osv.Vuln, pkg finding.Package, absent map[string]bool) finding.Finding {
+	canonical, aliases := osv.Canonical(v, absent)
 	sev, vector := osv.Severity(v)
 	return finding.Finding{
 		ID:        canonical,

@@ -6,22 +6,6 @@ import (
 	"github.com/FacileStudio/douane/internal/finding"
 )
 
-func TestCanonicalPrefersCVE(t *testing.T) {
-	id, aliases := Canonical(Vuln{ID: "GHSA-jf85-cpcp-j695", Aliases: []string{"CVE-2019-10744"}})
-	if id != "CVE-2019-10744" {
-		t.Fatalf("canonical = %q, want CVE-2019-10744", id)
-	}
-	if len(aliases) != 1 || aliases[0] != "GHSA-jf85-cpcp-j695" {
-		t.Fatalf("aliases = %v, want [GHSA-jf85-cpcp-j695]", aliases)
-	}
-}
-
-func TestCanonicalFallsBackToOwnID(t *testing.T) {
-	if id, _ := Canonical(Vuln{ID: "GO-2021-0053"}); id != "GO-2021-0053" {
-		t.Fatalf("canonical = %q, want GO-2021-0053", id)
-	}
-}
-
 func TestFixedInPicksTheInstalledBranch(t *testing.T) {
 	a := osvAffected("form-data", "npm", "SEMVER", Event{Fixed: "2.5.6"}, Event{Fixed: "4.0.6"})
 	v := Vuln{Affected: []Affected{a}}

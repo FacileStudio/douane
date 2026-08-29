@@ -111,7 +111,9 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return output.Report{}, exitUsage
 	}
-	report := output.Report{Target: target, Packages: len(pkgs), New: map[string]bool{}, Gaps: gaps}
+	build, buildGaps := inventory.BuildLines(target)
+	report := output.Report{Target: target, Packages: len(pkgs), New: map[string]bool{},
+		Gaps: append(gaps, buildGaps...), BuildLines: build}
 	if len(pkgs) == 0 {
 		report.Gaps = append(report.Gaps, finding.Gap{Kind: finding.GapUnsupported,
 			Subject: target, Detail: "no lockfile found, nothing was inspected"})

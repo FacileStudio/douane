@@ -70,7 +70,9 @@ func inventories(dirs []string) []*repoScan {
 			New:    map[string]bool{},
 		}}
 		pkgs, gaps, err := inventory.Scan(dir)
-		r.report.Gaps = gaps
+		build, buildGaps := inventory.BuildLines(dir)
+		r.report.BuildLines = build
+		r.report.Gaps = append(gaps, buildGaps...)
 		if err != nil {
 			r.report.Failed = true
 			r.report.Gaps = append(r.report.Gaps, finding.Gap{

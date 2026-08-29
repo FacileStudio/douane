@@ -41,9 +41,16 @@ type DatabaseSpecific struct {
 }
 
 // Vuln is the subset of an OSV record douane consumes.
+//
+// Withdrawn carries the timestamp at which the advisory was retracted, and OSV
+// leaves the field out entirely on a live record, so its presence is the whole
+// signal. Without it a retraction is invisible: CVE-2024-24788 was withdrawn on
+// 2025-02-28 and douane went on reporting it as a live finding, because a
+// retracted record answers a package query exactly like any other.
 type Vuln struct {
 	ID               string           `json:"id"`
 	Summary          string           `json:"summary"`
+	Withdrawn        string           `json:"withdrawn"`
 	Aliases          []string         `json:"aliases"`
 	Severity         []SeverityScore  `json:"severity"`
 	DatabaseSpecific DatabaseSpecific `json:"database_specific"`

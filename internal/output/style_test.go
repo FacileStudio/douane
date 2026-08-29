@@ -25,7 +25,7 @@ func styleFinding() finding.Finding {
 // Stripping the escapes must give back the plain render byte for byte.
 func TestColorChangesOnlyEscapeBytes(t *testing.T) {
 	f := styleFinding()
-	g := finding.Groups([]finding.Finding{f}, func(finding.Finding) bool { return true })[0]
+	g := finding.Groups([]finding.Finding{f}, func(finding.Finding) bool { return true }, nil)[0]
 
 	for _, tc := range []struct {
 		name  string

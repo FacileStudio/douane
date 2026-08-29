@@ -54,14 +54,33 @@ func Scan(root string) ([]finding.Package, []finding.Gap, error) {
 	}
 	c := &collector{
 		root:   abs,
+		gapSet: gapSet{noted: map[string]bool{}},
 		seen:   map[string]bool{},
-		noted:  map[string]bool{},
 		parsed: map[string]bool{},
 	}
 	if err := filepath.WalkDir(abs, c.visit); err != nil {
 		return nil, nil, err
 	}
 	return c.pkgs, c.gaps, nil
+}
+
+// gapSet accumulates the gaps of one walk, in order and without repeats. Two
+// walks of the same tree ask different questions of it, so the deduplication
+// belongs here rather than in either of them: the same subject and the same
+// detail is the same unanswered question however many files raised it.
+type gapSet struct {
+	noted map[string]bool
+	gaps  []finding.Gap
+}
+
+// gap records one unanswered question, unless it has already been recorded.
+func (g *gapSet) gap(kind finding.GapKind, subject, detail string) {
+	key := string(kind) + "|" + subject + "|" + detail
+	if g.noted[key] {
+		return
+	}
+	g.noted[key] = true
+	g.gaps = append(g.gaps, finding.Gap{Kind: kind, Subject: subject, Detail: detail})
 }
 
 func rel(root, path string) string {

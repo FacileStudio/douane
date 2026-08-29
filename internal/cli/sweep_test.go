@@ -49,8 +49,8 @@ func TestSharedResolutionKeepsEveryRepoFindings(t *testing.T) {
 	}
 	vulns := map[string]osv.Vuln{"CVE-2026-1": {ID: "CVE-2026-1", Summary: "boom"}}
 
-	fa, _ := buildFrom(a.pkgs, ids, vulns)
-	fb, _ := buildFrom(b.pkgs, ids, vulns)
+	fa, _ := buildFrom(a.pkgs, ids, vulns, nil)
+	fb, _ := buildFrom(b.pkgs, ids, vulns, nil)
 	if len(fa) != 1 || len(fb) != 1 {
 		t.Fatalf("findings = %d and %d, want one each — a shared package must be reported in both repos", len(fa), len(fb))
 	}

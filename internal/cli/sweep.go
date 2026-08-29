@@ -108,8 +108,9 @@ func resolveFleet(ctx context.Context, repos []*repoScan, sweep *output.Sweep) {
 	}
 	vulns, fetchGaps, _ := client.Fetch(ctx, flat)
 	sweep.Gaps = append(sweep.Gaps, fetchGaps...)
+	absent := client.Absent()
 	for _, r := range repos {
-		findings, rangeGaps := buildFrom(r.pkgs, ids, vulns)
+		findings, rangeGaps := buildFrom(r.pkgs, ids, vulns, absent)
 		r.report.Findings = findings
 		r.report.Gaps = append(r.report.Gaps, rangeGaps...)
 	}
@@ -135,12 +136,12 @@ func union(repos []*repoScan) []finding.Package {
 // walks that repository's own packages, so a finding reports the lockfile it
 // was actually read from, and dedup stays per repository.
 func buildFrom(pkgs []finding.Package, ids map[string][]string,
-	vulns map[string]osv.Vuln) ([]finding.Finding, []finding.Gap) {
+	vulns map[string]osv.Vuln, absent map[string]bool) ([]finding.Finding, []finding.Gap) {
 	byIndex := make([][]string, len(pkgs))
 	for i, p := range pkgs {
 		byIndex[i] = ids[pkgKey(p)]
 	}
-	return build(pkgs, byIndex, vulns)
+	return build(pkgs, byIndex, vulns, absent)
 }
 
 // enrichFleet enriches every finding in one pass, then hands the annotated

@@ -154,7 +154,7 @@ func TestBuildSurvivesAShortResolution(t *testing.T) {
 		{Name: "lodash", Ecosystem: "npm", Version: "4.17.20"},
 		{Name: "hono", Ecosystem: "npm", Version: "4.0.0"},
 	}
-	if got, _ := build(pkgs, nil, nil); got != nil {
+	if got, _ := build(pkgs, nil, nil, nil); got != nil {
 		t.Fatalf("build = %v, want nil — a query that answered for nothing must not be read past", got)
 	}
 }
