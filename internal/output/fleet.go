@@ -34,23 +34,23 @@ func sweepFixLines(w io.Writer, s Sweep) error {
 }
 
 func writeSweepText(w io.Writer, s Sweep, l Layout) error {
-	st, gl := newStyle(w), glyphsFor(w)
-	writeNotesText(w, st, s.Gaps, s.Warnings)
+	th := newTheme(w)
+	writeNotesText(w, th, s.Gaps, s.Warnings)
 	t := totalsOf(s)
 	if t.held == 0 && !anyNote(s) {
 		fmt.Fprintf(w, "%s — %d repos, %d packages, nothing held\n",
-			st.fix("clear"), len(s.Repos), t.packages)
+			th.fix("clear"), len(s.Repos), t.packages)
 		return nil
 	}
 	if l == LayoutFix && t.held > 0 {
-		writeSweepFixText(w, st, gl, s, t)
+		writeSweepFixText(w, th, s, t)
 		return nil
 	}
-	writeSweepRepoText(w, st, gl, s)
+	writeSweepRepoText(w, th, s)
 	return nil
 }
 
-func writeSweepFixText(w io.Writer, st style, gl glyphs, s Sweep, t fleetTotals) {
+func writeSweepFixText(w io.Writer, th theme, s Sweep, t fleetTotals) {
 	groups := fleetGroups(s)
 	verb := "clear"
 	if len(groups) == 1 {
@@ -59,20 +59,20 @@ func writeSweepFixText(w io.Writer, st style, gl glyphs, s Sweep, t fleetTotals)
 	fmt.Fprintf(w, "%d findings across %d repos, %d %s %s them\n\n",
 		t.held, repoCount(s), len(groups), fixes(len(groups)), verb)
 	for _, g := range groups {
-		writeGroup(w, st, gl, g)
+		writeGroup(w, th, g)
 	}
-	writeRepoNotes(w, st, s)
-	writeSweepSummary(w, st, gl, s, t, len(groups))
+	writeRepoNotes(w, th, s)
+	writeSweepSummary(w, th, s, t, len(groups))
 }
 
-func writeSweepRepoText(w io.Writer, st style, gl glyphs, s Sweep) {
+func writeSweepRepoText(w io.Writer, th theme, s Sweep) {
 	for _, r := range s.Repos {
 		if len(r.Findings) == 0 && len(r.Warnings) == 0 && len(r.Gaps) == 0 {
 			continue
 		}
-		writeRepo(w, st, gl, r)
+		writeRepo(w, th, r)
 	}
-	writeSweepSummary(w, st, gl, s, totalsOf(s), 0)
+	writeSweepSummary(w, th, s, totalsOf(s), 0)
 }
 
 // fleetGroups groups every finding in the run by the fix that clears it,
@@ -96,20 +96,20 @@ func fleetGroups(s Sweep) []finding.Group {
 // writeRepoNotes keeps the grouped view honest: a fix can collapse the
 // findings, but a repo the scanner could not fully read must still say so, by
 // name, or the group line reads as more certainty than the sweep earned.
-func writeRepoNotes(w io.Writer, st style, s Sweep) {
+func writeRepoNotes(w io.Writer, th theme, s Sweep) {
 	for _, r := range s.Repos {
 		if len(r.Gaps) == 0 && len(r.Warnings) == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "%s:\n", st.bold(r.Name))
-		writeNotesText(w, st, r.Gaps, r.Warnings)
+		fmt.Fprintf(w, "%s:\n", th.bold(r.Name))
+		writeNotesText(w, th, r.Gaps, r.Warnings)
 	}
 }
-func writeRepo(w io.Writer, st style, gl glyphs, r Report) {
+func writeRepo(w io.Writer, th theme, r Report) {
 	fmt.Fprintf(w, "%s — %d held out of %d packages\n\n",
-		st.bold(r.Name), len(r.Findings), r.Packages)
-	writeNotesText(w, st, r.Gaps, r.Warnings)
+		th.bold(r.Name), len(r.Findings), r.Packages)
+	writeNotesText(w, th, r.Gaps, r.Warnings)
 	for _, f := range r.Findings {
-		writeFinding(w, st, gl, f, r.New[f.Key()])
+		writeFinding(w, th, f, r.New[f.Key()])
 	}
 }

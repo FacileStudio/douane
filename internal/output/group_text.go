@@ -21,33 +21,33 @@ func capAt(ss []string, n int) string {
 // writeGroup renders one action: every finding cleared by taking one package
 // to one target version. The worst member speaks for the group's rank; its
 // summary is the only prose a decision needs.
-func writeGroup(w io.Writer, st style, gl glyphs, g finding.Group) {
+func writeGroup(w io.Writer, th theme, g finding.Group) {
 	worst := g.WorstFinding()
-	arrow := " " + st.dim(gl.To) + " " + st.fix(g.FixedIn)
+	arrow := " " + th.dim(th.To) + " " + th.fix(g.FixedIn)
 	if g.FixedIn == "" {
-		arrow = " " + st.dim(gl.To) + " " + st.warn("no fix")
+		arrow = " " + th.dim(th.To) + " " + th.warn("no fix")
 	}
 	fmt.Fprintf(w, "%s %s  %s%s %s%s%s\n",
-		st.mark(g.Worst, gl.Mark), st.mark(g.Worst, pad(g.Worst.String(), 8)),
-		st.dim(g.Ecosystem+":"), st.bold(g.Package),
-		st.dim(capAt(g.Installed, 3)), arrow, badge(st, worst, g.New > 0))
+		th.mark(g.Worst, th.Mark), th.mark(g.Worst, pad(g.Worst.String(), 8)),
+		th.dim(g.Ecosystem+":"), th.bold(g.Package),
+		th.dim(capAt(g.Installed, 3)), arrow, badge(th, worst, g.New > 0))
 	if worst.Summary != "" {
-		fmt.Fprintf(w, "    %s %s\n", st.dim(gl.Arrow), st.dim(worst.Summary))
+		fmt.Fprintf(w, "    %s %s\n", th.dim(th.Arrow), th.dim(worst.Summary))
 	}
-	writeGroupDetail(w, st, gl, g, worst)
+	writeGroupDetail(w, th, g, worst)
 	fmt.Fprintln(w)
 }
 
 // writeGroupDetail carries the advisory ids, exploit likelihood and affected
 // targets under the headline, capped so a fleet-wide package stays one block.
-func writeGroupDetail(w io.Writer, st style, gl glyphs, g finding.Group, worst finding.Finding) {
-	sep := " " + st.dim(gl.Sep) + " "
+func writeGroupDetail(w io.Writer, th theme, g finding.Group, worst finding.Finding) {
+	sep := " " + th.dim(th.Sep) + " "
 	count := fmt.Sprintf("%d finding%s", g.Count, plural(g.Count))
 	targets := fmt.Sprintf("%d target%s: %s", len(g.Targets), plural(len(g.Targets)),
 		capAt(g.Targets, 5))
 	fmt.Fprintf(w, "      %s%s%s%s%s\n",
-		st.dim(count), sep, epssLabel(st, gl, worst), sep, st.dim(targets))
-	fmt.Fprintf(w, "      %s\n", st.dim(capAt(g.IDs, 3)))
+		th.dim(count), sep, epssLabel(th, worst), sep, th.dim(targets))
+	fmt.Fprintf(w, "      %s\n", th.dim(capAt(g.IDs, 3)))
 }
 
 func plural(n int) string {

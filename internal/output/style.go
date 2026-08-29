@@ -3,8 +3,6 @@ package output
 import (
 	"io"
 	"os"
-
-	"github.com/FacileStudio/douane/internal/finding"
 )
 
 const (
@@ -76,12 +74,6 @@ func (s style) fix(text string) string { return s.paint(ansiGreen, text) }
 // ransomware. Severity gets its own ramp in severityColour, which reaches red
 // only at critical, so red keeps meaning red in both places.
 func (s style) alarm(text string) string { return s.paint(ansiRed, text) }
-
-// mark paints a severity glyph. Hue rides the mark rather than the whole line,
-// so severity stays scannable without 3400 findings' worth of coloured prose.
-func (s style) mark(sev finding.Severity, text string) string {
-	return s.paint(severityColour(sev), text)
-}
 
 // warn carries the second tier: new since the last run, no fix available, and
 // an exploit probability above epssNotable.

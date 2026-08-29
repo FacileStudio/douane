@@ -34,12 +34,12 @@ func writeNotes(w io.Writer, prefix string, gaps []finding.Gap, warnings []strin
 // writeNotesText renders the human form. A gap is marked with a question, not
 // a bang: it is an unanswered question, and nothing about it should read like
 // a finding.
-func writeNotesText(w io.Writer, st style, gaps []finding.Gap, warnings []string) {
+func writeNotesText(w io.Writer, th theme, gaps []finding.Gap, warnings []string) {
 	for _, g := range finding.Gaps(gaps) {
-		fmt.Fprintf(w, "  %s %s\n", st.warn("?"), st.dim(g))
+		fmt.Fprintf(w, "  %s %s\n", th.warn("?"), th.dim(g))
 	}
 	for _, warn := range warnings {
-		fmt.Fprintf(w, "  %s %s\n", st.warn("!"), st.dim(warn))
+		fmt.Fprintf(w, "  %s %s\n", th.warn("!"), th.dim(warn))
 	}
 	if len(gaps)+len(warnings) > 0 {
 		fmt.Fprintln(w)

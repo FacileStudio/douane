@@ -29,15 +29,15 @@ func TestColorChangesOnlyEscapeBytes(t *testing.T) {
 
 	for _, tc := range []struct {
 		name  string
-		write func(*bytes.Buffer, style)
+		write func(*bytes.Buffer, theme)
 	}{
-		{"finding", func(b *bytes.Buffer, st style) { writeFinding(b, st, unicodeGlyphs, f, true) }},
-		{"group", func(b *bytes.Buffer, st style) { writeGroup(b, st, unicodeGlyphs, g) }},
+		{"finding", func(b *bytes.Buffer, th theme) { writeFinding(b, th, f, true) }},
+		{"group", func(b *bytes.Buffer, th theme) { writeGroup(b, th, g) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var plain, painted bytes.Buffer
-			tc.write(&plain, style{})
-			tc.write(&painted, style{on: true})
+			tc.write(&plain, theme{glyphs: unicodeGlyphs})
+			tc.write(&painted, theme{style: style{on: true}, glyphs: unicodeGlyphs})
 
 			if painted.String() == plain.String() {
 				t.Fatal("style{on: true} emitted no escape sequences")
@@ -54,11 +54,11 @@ func TestColorChangesOnlyEscapeBytes(t *testing.T) {
 // this package free of escape sequences without knowing colour exists.
 func TestNoColorIsHonoured(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
-	if newStyle(nil).on {
+	if newTheme(nil).on {
 		t.Error("NO_COLOR set, still painting")
 	}
 	t.Setenv("NO_COLOR", "")
-	if newStyle(&bytes.Buffer{}).on {
+	if newTheme(&bytes.Buffer{}).on {
 		t.Error("a buffer is not a terminal, still painting")
 	}
 }
