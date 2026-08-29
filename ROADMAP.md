@@ -23,7 +23,7 @@ That gap is the roadmap, and the shape of it is now known rather than guessed:
 
 | Cut | Findings | Where the work lives |
 |---|---|---|
-| Go stdlib and toolchain | 1879 (49%) | **not douane.** Bump the `go` directive in 38 repos |
+| ~~Go stdlib and toolchain~~ | ~~1879 (49%)~~ | **done 2026-08-29.** v1.8 reads the builder image; 787 are a rebuild |
 | npm reachable only from `devDependencies` | 523 of 1371 classified (38%) | v2.3 |
 | RUSTSEC informational, not vulnerabilities | 77 of 141 crates findings (55%) | v2.4 |
 | Go dependencies that are not the toolchain | 124 | v2.1 |
@@ -126,12 +126,17 @@ Zero hits out of 3816, enriched. Two prior measurements at 732 and 1965 said the
 
 ### Two correctness defects that a bigger fleet made visible
 
-**541 findings (14%), across 45 repos, are reported under an advisory id that OSV does not
-serve.** `Canonical` in `internal/osv/resolve.go` ranks CVE > GHSA > everything else and takes
-the winner out of the alias list without checking it resolves. 27 distinct ids, 25 of them CVEs
-promoted over the `GO-*` record that OSV actually returned. The id that works is demoted to an
-alias, and the alias closure then cannot fetch the promoted one, so those findings also land
-UNKNOWN. v1.6.
+**11 findings are reported under an advisory id that exists nowhere.** The first count filed
+here was 541 across 45 repos, and it was wrong: it counted every primary id OSV answers 404 for,
+but 25 of those 27 ids are CVEs that resolve perfectly well at nvd.nist.gov, checked 2026-08-29.
+Absent from OSV is not the same as unlookupable. Only two ids are genuinely broken, both GHSAs
+that 404 on OSV **and** on github.com/advisories, and they cover 11 findings.
+
+The cause is real either way: `Canonical` in `internal/osv/resolve.go` ranked CVE > GHSA > rest
+and took the winner out of the alias list without checking it resolves. The lesson is in the
+correction, not the bug. Narrowing the rule to ids **proven absent**, rather than ids douane
+does not happen to hold, is what kept the fix from demoting almost every npm finding to its
+GHSA and rewriting the history the store keys on that id. Fixed 2026-08-29.
 
 **All 43 severity gaps now have a cause, and only 3 are irreducible.** Probing every gap subject
 against OSV: **32 are RUSTSEC informational advisories** (26 unmaintained, 6 unsound) that carry
@@ -156,7 +161,8 @@ douane can see none of it. v1.7.
 
 Evidence, not milestone numbers, sets this. Reordered 2026-08-28 against the v0.2 baseline:
 
-1. ~~**v1.2** feed caching~~, shipped 2026-08-19
+1. ~~**v1.8** toolchain resolution~~ and ~~**v1.9** release-line collapse~~, shipped 2026-08-29
+2. ~~**v1.2** feed caching~~, shipped 2026-08-19
 2. ~~**v1.3** `douane sweep`~~, shipped 2026-08-19
 3. ~~**v1.5** gaps and the incomplete-scan contract~~, shipped 2026-08-23
 4. ~~**v2.2** severity from the alias closure~~, shipped 2026-08-23
@@ -164,8 +170,7 @@ Evidence, not milestone numbers, sets this. Reordered 2026-08-28 against the v0.
 6. **The Go directive chore.** Not a milestone and not douane's code. 1879 findings, 38 repos,
    one line each. Do it first so every number below is measured against a fleet that is not
    half noise.
-7. **v1.6** withdrawn and unresolvable ids. Correctness, 541 mislabelled findings, and 8 of the
-   43 severity gaps as a side effect. Smallest item on the list.
+7. ~~**v1.6** withdrawn and unresolvable ids~~, shipped 2026-08-29 alongside v1.8.
 8. **v2.3** dev-only dependencies. 523 findings, computable offline from the lockfile already
    parsed, no new feed and no new binary. Now the largest cut douane itself can make.
 9. **v2.4** informational advisories. 77 findings, one field.
@@ -299,13 +304,15 @@ message naming the line.
 
 **Depends on.** Nothing.
 
-### v1.6 Withdrawn advisories, and ids that do not resolve
+### v1.6 Withdrawn advisories, and ids that do not resolve, shipped 2026-08-29
 
 **Why.** Two defects found in the v0.2 baseline, both in identity handling, both silent.
 
 `Canonical` (`internal/osv/resolve.go`) reports a finding under the highest-ranked id it can find
 in `{v.ID} ∪ v.Aliases`, CVE over GHSA over the rest, without checking that the winner exists in
-OSV. Measured: **541 findings across 45 repos**, 27 distinct ids, carry a primary identifier that
+OSV. First measured as **541 findings across 45 repos** under 27 distinct ids, which overstated
+it: 25 of those ids are CVEs that resolve at nvd.nist.gov, so they are poor keys for a
+round-trip and fine keys for a human. The real defect is the 11 findings under a GHSA that
 `GET /v1/vulns/<id>` answers 404 for. `github.com/klauspost/compress@1.17.11` is reported as
 `GHSA-259r-337f-4rfw`, which 404s, while `GO-2026-5841`, which OSV returned and which resolves,
 sits in `aliases`. `h2` is reported as `GHSA-q83h-524g-xf6h` in 8 repos, same story, with
@@ -333,6 +340,50 @@ TTL so 27 ids are not re-requested on every sweep.
 a `withdrawn` record. Severity gaps drop by 8 with no change to `internal/osv/severity.go`.
 
 **Depends on.** Nothing. Sharpens v1.1, v5.2 and v5.3, all of which key on the id.
+
+### v1.8 The toolchain that builds the binary, shipped 2026-08-29
+
+**Why.** The `go` directive is a floor, not the version that ships. Since Go 1.21 the toolchain
+used is whichever is installed if newer, and every containerised app here builds from a floating
+`golang:1.25` tag resolving to the newest patch. douane read the floor and reported it as the
+shipped version, so half the fleet's findings described a binary nobody runs.
+
+**What shipped.** `inventory.BuildLines` reads which module each Dockerfile stage actually
+builds, from the `COPY <path>/go.mod` line inside a `FROM golang` stage. Per module, never per
+repo: Journal has three modules, a root Dockerfile building `apps/api`, a second under
+`apps/collector`, and `sdk/journal` built by neither because it is a library shipped as source.
+A repo-wide heuristic would have told that library's consumers their compiler was patched.
+
+Findings whose fix lands on the line the image already builds from are labelled `REBUILD`. The
+label never suppresses: whether the image has been rebuilt since the advisory landed is a
+question douane cannot answer, so `-fail` still counts them.
+
+**Exit criterion, met.** Registre 12 fixes to 5, 37 of its 40 findings marked rebuild, leaving 3
+real. Journal 39 to 13. The fleet 315 distinct actions to 195, with 787 findings cleared by a
+rebuild. `sdk/journal` correctly carries none.
+
+**Depends on.** Nothing.
+
+### v1.9 Collapse a release line, shipped 2026-08-29
+
+**Why.** A linearly versioned package broke the one-group-per-decision premise that v1.4 exists
+for. On Registre the Go `stdlib` alone produced six groups at `1.25.8` through `1.25.13`, when
+`1.25.13` clears all six.
+
+**What shipped.** Groups fold within a release line, keeping the highest patch. Only within one:
+a repo with modules on `go 1.24` and `go 1.25` carries targets on both lines at once, and merging
+them would sell a minor upgrade as a patch bump.
+
+Rebuild-ness is part of the group key rather than a label applied afterwards. Journal put 46
+findings cleared by rebuilding and 29 needing a real bump into one collapsed group, both at
+`1.25.13`, because they came from different modules. A group is named by what clears it, so
+labelling that group either way hid half of it. **A grouping rule that can mix two actions is a
+false negative waiting for a fleet big enough to show it.**
+
+**Exit criterion, met.** Six same-line targets collapse to one; the two-line case stays two; the
+same target version under different build situations stays two.
+
+**Depends on.** v1.4.
 
 ### v1.7 pnpm and pip
 
