@@ -20,7 +20,7 @@ func client() *httpx.Client {
 func TestJSONRefusesNonOKBeforeDecoding(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"code":3,"message":"invalid ecosystem"}`))
+		w.Write([]byte(`{"code":3,"message":"invalid ecosystem"}`))
 	}))
 	defer srv.Close()
 
@@ -48,7 +48,7 @@ func TestClientErrorIsNotRetried(t *testing.T) {
 			w.WriteHeader(code)
 		}))
 		var out struct{}
-		_ = client().JSON(context.Background(), http.MethodGet, srv.URL, nil, &out)
+		client().JSON(context.Background(), http.MethodGet, srv.URL, nil, &out)
 		srv.Close()
 		if got := calls.Load(); got != 1 {
 			t.Errorf("status %d was attempted %d times, want 1", code, got)
@@ -63,7 +63,7 @@ func TestRetriesThenSucceeds(t *testing.T) {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
-		_, _ = w.Write([]byte(`{"ok":true}`))
+		w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -108,7 +108,7 @@ func TestRetryAfterSecondsIsHonoured(t *testing.T) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		_, _ = w.Write([]byte(`{}`))
+		w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
 
@@ -164,7 +164,7 @@ func TestSetsUserAgent(t *testing.T) {
 	got := make(chan string, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got <- r.Header.Get("User-Agent")
-		_, _ = w.Write([]byte(`{}`))
+		w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
 

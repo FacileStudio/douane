@@ -37,10 +37,10 @@ func osvVulnServer(t *testing.T, records map[string]Vuln) (*Client, *atomic.Int3
 		v, ok := records[strings.TrimPrefix(r.URL.Path, "/v1/vulns/")]
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"code":5,"message":"Bug not found."}`))
+			w.Write([]byte(`{"code":5,"message":"Bug not found."}`))
 			return
 		}
-		_ = json.NewEncoder(w).Encode(v)
+		json.NewEncoder(w).Encode(v)
 	})
 	return c, &hits
 }

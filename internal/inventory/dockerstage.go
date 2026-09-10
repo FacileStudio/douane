@@ -41,8 +41,9 @@ func dockerLogicalLines(data []byte) []string {
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
-		if strings.HasSuffix(line, "\\") {
-			buf.WriteString(strings.TrimSpace(strings.TrimSuffix(line, "\\")) + " ")
+		if base, joined := strings.CutSuffix(line, "\\"); joined {
+			buf.WriteString(strings.TrimSpace(base))
+			buf.WriteString(" ")
 			continue
 		}
 		buf.WriteString(line)

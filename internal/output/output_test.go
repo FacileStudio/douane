@@ -101,7 +101,9 @@ func TestLineByFixPrintsOneLinePerAction(t *testing.T) {
 
 // TestTextByFixCollapsesRepeatedBumps is v1.4's exit criterion in miniature:
 // the same upgrade advised against several installed versions is one decision,
-// so it prints once with a count instead of once per finding.
+// so it prints once with a count instead of once per finding. A buffer is not a
+// terminal and declares no locale, so the assertions below expect the ASCII
+// glyph set: "->", not "→", the same rule as filet.
 func TestTextByFixCollapsesRepeatedBumps(t *testing.T) {
 	r := outReport()
 	f2 := outFinding("GO-2")
@@ -111,8 +113,6 @@ func TestTextByFixCollapsesRepeatedBumps(t *testing.T) {
 	if got := strings.Count(stdout, "chi"); got != 1 {
 		t.Fatalf("text names chi %d times, want one action block:\n%s", got, stdout)
 	}
-	// A buffer is not a terminal and declares no locale, so it renders with the
-	// ASCII glyph set: "->", not "→". Same rule as filet.
 	for _, want := range []string{"2 findings", "4.11.0, 5.0.0 -> 5.0.12", "1 fix", "2 high"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("text = %q, want it to carry %q", stdout, want)

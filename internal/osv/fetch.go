@@ -91,14 +91,12 @@ func (c *Client) fetchAll(ctx context.Context, ids []string) <-chan fetchResult 
 
 	var wg sync.WaitGroup
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for id := range jobs {
 				v, err := c.fetchOne(ctx, id)
 				results <- fetchResult{id: id, vuln: v, err: err}
 			}
-		}()
+		})
 	}
 	go func() {
 		for _, id := range ids {

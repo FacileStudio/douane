@@ -1,5 +1,6 @@
 package finding
 
+import "slices"
 import "sort"
 
 // Group is one action that clears findings: take one package to one target
@@ -122,10 +123,8 @@ func (g *Group) absorb(f Finding, isNew func(Finding) bool) {
 }
 
 func appendUnique(ss []string, s string) []string {
-	for _, x := range ss {
-		if x == s {
-			return ss
-		}
+	if slices.Contains(ss, s) {
+		return ss
 	}
 	return append(ss, s)
 }

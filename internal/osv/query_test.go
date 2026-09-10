@@ -12,7 +12,7 @@ import (
 )
 
 func osvRespond(w http.ResponseWriter, results ...batchResult) {
-	_ = json.NewEncoder(w).Encode(batchResponse{Results: results})
+	json.NewEncoder(w).Encode(batchResponse{Results: results})
 }
 
 func osvHit(ids ...string) batchResult {
@@ -29,7 +29,7 @@ func osvHit(ids ...string) batchResult {
 func TestQueryRefusesAnErrorEnvelope(t *testing.T) {
 	c := osvClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"code":8,"message":"rate limit exceeded"}`))
+		w.Write([]byte(`{"code":8,"message":"rate limit exceeded"}`))
 	})
 	pkgs := osvPackages(2)
 	ids, gaps, err := c.Query(context.Background(), pkgs)
@@ -91,7 +91,7 @@ func TestQueryKeepsTheChunksThatSucceeded(t *testing.T) {
 		queries := osvQueries(t, r)
 		if calls.Add(1) > 1 {
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"code":13,"message":"internal"}`))
+			w.Write([]byte(`{"code":13,"message":"internal"}`))
 			return
 		}
 		results := make([]batchResult, len(queries))

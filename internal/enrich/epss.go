@@ -2,6 +2,7 @@ package enrich
 
 import (
 	"context"
+	"maps"
 	"time"
 )
 
@@ -21,9 +22,7 @@ func (e *Enricher) epssScores(ctx context.Context, cves []string, res *Result) (
 	if err := e.saveEPSS(missing, fetched); err != nil {
 		res.CacheErr = err
 	}
-	for cve, score := range fetched {
-		cached[cve] = score
-	}
+	maps.Copy(cached, fetched)
 	return scored(cached), nil
 }
 

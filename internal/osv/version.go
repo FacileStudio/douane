@@ -27,8 +27,8 @@ func splitVersion(v string) (string, string) {
 	if i := strings.IndexByte(v, '+'); i >= 0 {
 		v = v[:i]
 	}
-	if i := strings.IndexByte(v, '-'); i >= 0 {
-		return v[:i], v[i+1:]
+	if core, tail, ok := strings.Cut(v, "-"); ok {
+		return core, tail
 	}
 	return v, ""
 }
