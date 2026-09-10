@@ -171,8 +171,9 @@ Evidence, not milestone numbers, sets this. Reordered 2026-08-28 against the v0.
    one line each. Do it first so every number below is measured against a fleet that is not
    half noise.
 7. ~~**v1.6** withdrawn and unresolvable ids~~, shipped 2026-08-29 alongside v1.8.
-8. **v2.3** dev-only dependencies. 523 findings, computable offline from the lockfile already
-   parsed, no new feed and no new binary. Now the largest cut douane itself can make.
+8. ~~**v2.3** dev-only dependencies~~, shipped 2026-09-10 as v0.5.0. The offline graph walk
+   separated a 2697-finding fleet into 2392 prod and 305 dev with no leakage. Now the largest cut
+   douane itself can make is done; the running mate remains.
 9. **v2.4** informational advisories. 77 findings, one field.
 10. **v5.1** the nightly daemon. The trigger the tool was built for, and the only one that
     matches how the answer changes. Do it once the count is survivable, not before.
@@ -431,7 +432,7 @@ from the measurement, not from the scan.
 **Depends on.** The Go directive chore, so the 124 is what gets measured. Needs a Go toolchain and
 `govulncheck` wherever the sweep runs; ruche has neither today.
 
-### v2.3 Dev-only dependencies
+### v2.3 Dev-only dependencies — shipped 2026-09-10 (v0.5.0)
 
 **Why.** After the Go chore, npm is the fleet at 1672 findings, and reachability in the
 govulncheck sense does not exist for it. The axis that does exist is in the lockfile already:
@@ -461,10 +462,12 @@ the one that hides a real finding.
 ranking demotes `dev` below `prod` at equal severity from day one, which is where most of the
 value is even before anyone passes a flag.
 
-**Exit criterion.** Every npm finding carries `scope`, `douane sweep -scope prod` returns a
-strictly smaller set than `-scope all`, and a package pulled in by both a runtime and a build
-dependency reports `prod`. Spot-check three findings against `bun pm ls --all` in the repo they
-came from.
+**Exit criterion, met.** Every npm finding in `-format json` carries `scope` under
+`exploit.scope`. `douane sweep -scope prod` (2392) is strictly smaller than `-scope all` (2697),
+the 305 difference is exactly the `dev` set, and no scope leaks across either filter. A package
+pulled in by both a runtime and a build dependency reports `prod`. Spot-check confirmed the
+demotion is correct, not just consistent: vitrine's `hono`/`express`/`qs` are dev because the
+only path to them is root devDependencies → `shadcn` → `@modelcontextprotocol/sdk`.
 
 **Depends on.** Nothing. Cheaper and larger than v2.1; do it first.
 
