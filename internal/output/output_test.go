@@ -120,6 +120,25 @@ func TestTextByFixCollapsesRepeatedBumps(t *testing.T) {
 	}
 }
 
+// TestTextMarksDevOnlyGroups pins the v2.3 demotion marker: a group whose
+// representative finding carries a dev scope appends "(dev)" to its primary
+// line, and an unclassified or prod group prints no marker at all.
+func TestTextMarksDevOnlyGroups(t *testing.T) {
+	r := outReport()
+	r.Findings[0].Exploit.Scope = finding.ScopeDev
+	stdout, _ := outWriteTo(t, output.Text, output.LayoutFix, r)
+	if got := strings.Count(stdout, "(dev)"); got != 1 {
+		t.Fatalf("text has %d dev markers, want one on the group line:\n%s", got, stdout)
+	}
+	if !strings.Contains(stdout, "5.0.0 -> 5.0.12  [NEW] (dev)") {
+		t.Fatalf("text = %q, want the marker on the primary line", stdout)
+	}
+	stdout, _ = outWriteTo(t, output.Text, output.LayoutFix, outReport())
+	if got := strings.Count(stdout, "(dev)"); got != 0 {
+		t.Fatalf("text has %d dev markers, want none on an unclassified group:\n%s", got, stdout)
+	}
+}
+
 // TestTextByFindingKeepsOneBlockPerFinding guards the escape hatch: the flat
 // view must still exist verbatim for whoever needs the old report.
 func TestTextByFindingKeepsOneBlockPerFinding(t *testing.T) {

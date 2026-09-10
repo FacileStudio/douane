@@ -85,7 +85,7 @@ func TestSweepCarriesEveryRepoGap(t *testing.T) {
 		Detail:  "composer.lock is not an ecosystem douane reads",
 	}}
 	var sweep output.Sweep
-	collect([]*repoScan{r}, nil, &sweep)
+	collect([]*repoScan{r}, nil, &sweep, finding.FilterAll)
 
 	if got := sweep.AllGaps(); len(got) != 1 || got[0].Kind != finding.GapUnsupported {
 		t.Fatalf("AllGaps = %v, want the repo gap — a gap that never reaches the sweep cannot set the exit code", got)

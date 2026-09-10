@@ -77,6 +77,7 @@ type Package struct {
 	Ecosystem string `json:"ecosystem"`
 	Version   string `json:"version"`
 	Source    string `json:"source"`
+	Scope     Scope  `json:"scope,omitempty"`
 }
 
 // Exploit groups the signals that say whether a flaw is likely to hurt in
@@ -87,6 +88,7 @@ type Exploit struct {
 	EPSS       float64 `json:"epss"`
 	EPSSKnown  bool    `json:"epss_known"`
 	Reachable  *bool   `json:"reachable"`
+	Scope      Scope   `json:"scope,omitempty"`
 }
 
 // Finding is one vulnerability affecting one package, after alias resolution

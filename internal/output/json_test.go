@@ -77,3 +77,33 @@ func TestJSONEmitsArraysNotNull(t *testing.T) {
 		}
 	}
 }
+
+// TestJSONPinsFindingScope is v2.3's machine channel for the dev demotion:
+// the scope a finding was classified with rides on the finding itself, and an
+// unclassified finding omits the key so a consumer never parses an empty tag.
+func TestJSONPinsFindingScope(t *testing.T) {
+	r := outReport()
+	r.Findings[0].Exploit.Scope = finding.ScopeDev
+	stdout, _ := outWriteTo(t, output.JSON, output.LayoutFix, r)
+	if !strings.Contains(stdout, `"scope": "dev"`) {
+		t.Fatalf("json = %s, want the dev scope pinned on the finding", stdout)
+	}
+	var doc struct {
+		Findings []struct {
+			ID      string `json:"id"`
+			Exploit struct {
+				Scope finding.Scope `json:"scope"`
+			} `json:"exploit"`
+		} `json:"findings"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+		t.Fatalf("decode %s: %v", stdout, err)
+	}
+	if doc.Findings[0].Exploit.Scope != finding.ScopeDev {
+		t.Fatalf("scope = %q, want dev", doc.Findings[0].Exploit.Scope)
+	}
+	stdout, _ = outWriteTo(t, output.JSON, output.LayoutFix, outReport())
+	if strings.Contains(stdout, "scope") {
+		t.Fatalf("json = %s, want no scope key on an unclassified finding", stdout)
+	}
+}

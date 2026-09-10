@@ -11,6 +11,7 @@ type npmLock struct {
 	Packages map[string]struct {
 		Version string `json:"version"`
 		Link    bool   `json:"link"`
+		Dev     bool   `json:"dev"`
 	} `json:"packages"`
 	Dependencies map[string]struct {
 		Version string `json:"version"`
@@ -37,7 +38,11 @@ func fromPackages(lock npmLock) []finding.Package {
 		if !ok || entry.Link || entry.Version == "" {
 			continue
 		}
-		pkgs = append(pkgs, finding.Package{Name: name, Ecosystem: "npm", Version: entry.Version})
+		scope := finding.ScopeProd
+		if entry.Dev {
+			scope = finding.ScopeDev
+		}
+		pkgs = append(pkgs, finding.Package{Name: name, Ecosystem: "npm", Version: entry.Version, Scope: scope})
 	}
 	return pkgs
 }
@@ -60,7 +65,7 @@ func fromDependencies(lock npmLock) []finding.Package {
 		if entry.Version == "" {
 			continue
 		}
-		pkgs = append(pkgs, finding.Package{Name: name, Ecosystem: "npm", Version: entry.Version})
+		pkgs = append(pkgs, finding.Package{Name: name, Ecosystem: "npm", Version: entry.Version, Scope: finding.ScopeProd})
 	}
 	return pkgs
 }

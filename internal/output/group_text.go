@@ -27,10 +27,14 @@ func writeGroup(w io.Writer, th theme, g finding.Group) {
 	if g.FixedIn == "" {
 		arrow = " " + th.dim(th.To) + " " + th.warn("no fix")
 	}
+	flags := groupBadge(th, g, worst)
+	if worst.Exploit.Scope == finding.ScopeDev {
+		flags += " " + th.dim("(dev)")
+	}
 	fmt.Fprintf(w, "%s %s  %s%s %s%s%s\n",
 		th.mark(g.Worst, th.Mark), th.mark(g.Worst, pad(g.Worst.String(), 8)),
 		th.dim(g.Ecosystem+":"), th.bold(g.Package),
-		th.dim(capAt(g.Installed, 3)), arrow, groupBadge(th, g, worst))
+		th.dim(capAt(g.Installed, 3)), arrow, flags)
 	if worst.Summary != "" {
 		fmt.Fprintf(w, "    %s %s\n", th.dim(th.Arrow), th.dim(worst.Summary))
 	}

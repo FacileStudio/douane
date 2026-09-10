@@ -71,6 +71,7 @@ func newFinding(v osv.Vuln, pkg finding.Package, absent map[string]bool) finding
 		FixedIn:   osv.FixedIn(v, pkg),
 		Target:    pkg.Source,
 		Sources:   []string{"osv"},
+		Exploit:   finding.Exploit{Scope: pkg.Scope},
 	}
 }
 

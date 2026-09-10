@@ -111,6 +111,19 @@ func TestSweepTextByFixKeepsRepoGapsVisible(t *testing.T) {
 	}
 }
 
+// TestSweepTextMarksDevOnlyGroups proves the grouped fleet view reaches the
+// same writeGroup as a single scan: a fleet whose one group is dev-only gets
+// the marker exactly once, on that group's line.
+func TestSweepTextMarksDevOnlyGroups(t *testing.T) {
+	s := fleetSweep()
+	s.Repos[0].Findings[0].Exploit.Scope = finding.ScopeDev
+	s.Repos[1].Findings[0].Exploit.Scope = finding.ScopeDev
+	stdout, _ := outWriteSweepLayout(t, output.Text, output.LayoutFix, s)
+	if got := strings.Count(stdout, "(dev)"); got != 1 {
+		t.Fatalf("sweep has %d dev markers, want one on the group line:\n%s", got, stdout)
+	}
+}
+
 func TestSweepTextByFindingKeepsPerRepoBlocks(t *testing.T) {
 	stdout, _ := outWriteSweepLayout(t, output.Text, output.LayoutFinding, fleetSweep())
 	if got := strings.Count(stdout, "— 1 held out of 10 packages"); got != 2 {

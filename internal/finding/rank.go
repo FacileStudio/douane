@@ -41,8 +41,11 @@ func Rank(fs []Finding) {
 // without a second, quietly different, notion of "worst".
 //
 // The order is lexicographic over KEV, then the EPSS band, then severity, then
-// the raw score, then a stable tiebreak. Every axis is totally ordered, which
-// is what keeps the comparison transitive: an earlier version compared EPSS
+// scope, then the raw score, then a stable tiebreak. Scope demotes dev-only
+// findings below prod and unknown ones at equal severity: a package that only
+// builds the artifact is not the one that ships the flaw. Every axis is totally
+// ordered, which is what keeps the comparison transitive: an earlier version
+// compared EPSS
 // only when both scores were known and fell through to severity otherwise,
 // which yields a < c < b and b < a for three findings and leaves sort.Stable
 // free to return any order at all.
@@ -59,6 +62,8 @@ func Less(a, b Finding) bool {
 		return at > bt
 	case a.Severity != b.Severity:
 		return a.Severity > b.Severity
+	case (a.Exploit.Scope == ScopeDev) != (b.Exploit.Scope == ScopeDev):
+		return a.Exploit.Scope != ScopeDev
 	case a.Exploit.EPSS != b.Exploit.EPSS:
 		return a.Exploit.EPSS > b.Exploit.EPSS
 	case a.Package != b.Package:

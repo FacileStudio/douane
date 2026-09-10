@@ -28,6 +28,8 @@ Flags:
                                 or print every finding on its own
   -fail   never|any|low|medium|high|critical|kev
                                 exit 1 at or above (default never)
+  -scope  all|prod|dev          filter findings by how far they reach a runtime
+                                (default all)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
@@ -126,6 +128,7 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 		report.Gaps = append(report.Gaps, res.Gaps...)
 	}
 	finding.Rank(report.Findings)
+	report.Findings = finding.FilterScope(report.Findings, opts.scopeFilter)
 	record(st, &report)
 	return report, exitClear
 }

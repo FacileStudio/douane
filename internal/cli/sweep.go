@@ -81,7 +81,7 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 		sweep.Warnings = append(sweep.Warnings, warnings...)
 		sweep.Gaps = append(sweep.Gaps, gaps...)
 	}
-	collect(repos, st, &sweep)
+	collect(repos, st, &sweep, opts.scopeFilter)
 	return sweep, exitClear
 }
 
@@ -166,11 +166,13 @@ func enrichFleet(ctx context.Context, opts options, st *store.Store, repos []*re
 	return enrichWarnings(res), res.Gaps
 }
 
-// collect ranks each repository, records its history and orders the fleet so
-// the first group printed is the one to open first.
-func collect(repos []*repoScan, st *store.Store, sweep *output.Sweep) {
+// collect ranks each repository, filters it to the requested scope, records
+// its history and orders the fleet so the first group printed is the one to
+// open first.
+func collect(repos []*repoScan, st *store.Store, sweep *output.Sweep, scope finding.ScopeFilter) {
 	for _, r := range repos {
 		finding.Rank(r.report.Findings)
+		r.report.Findings = finding.FilterScope(r.report.Findings, scope)
 		record(st, &r.report)
 		sweep.Repos = append(sweep.Repos, r.report)
 	}

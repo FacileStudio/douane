@@ -56,6 +56,35 @@ func TestParseArgsRejectsAnUnknownFail(t *testing.T) {
 	}
 }
 
+func TestParseArgsAcceptsAScope(t *testing.T) {
+	cliQuiet(t)
+	cases := map[string]string{
+		"prod":    "prod",
+		"dev":     "dev",
+		"all":     "all",
+		"default": "all",
+	}
+	for name, want := range cases {
+		t.Run(name, func(t *testing.T) {
+			args := []string{"/target"}
+			if want != "" {
+				args = []string{"-scope", want, "/target"}
+			}
+			opts, code := parseArgs("scan", args)
+			if code != exitClear || opts.scope != want {
+				t.Fatalf("scope = %q code = %d, want %q %d", opts.scope, code, want, exitClear)
+			}
+		})
+	}
+}
+
+func TestParseArgsRejectsAnUnknownScope(t *testing.T) {
+	cliQuiet(t)
+	if _, code := parseArgs("scan", []string{"-scope", "bogus"}); code != exitUsage {
+		t.Fatalf("code = %d, want %d", code, exitUsage)
+	}
+}
+
 func TestParseArgsDefaultsToGroupedByFix(t *testing.T) {
 	cliQuiet(t)
 	opts, code := parseArgs("scan", []string{"/target"})

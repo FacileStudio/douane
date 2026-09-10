@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/output"
 )
 
@@ -14,15 +15,17 @@ import (
 // that finished during parsing: -h prints the usage and leaves nothing to
 // scan, so asking for help still exits 0.
 type options struct {
-	path     string
-	format   string
-	by       string
-	failOn   string
-	fail     threshold
-	dbPath   string
-	noEnrich bool
-	refresh  bool
-	done     bool
+	path        string
+	format      string
+	by          string
+	failOn      string
+	fail        threshold
+	dbPath      string
+	scope       string
+	scopeFilter finding.ScopeFilter
+	noEnrich    bool
+	refresh     bool
+	done        bool
 }
 
 // parseArgs reads the flags and the single optional path. The path is taken
@@ -30,7 +33,7 @@ type options struct {
 // natural CI line, and reading it only from the front made that one scan $PWD
 // while reporting success.
 func parseArgs(name string, args []string) (options, int) {
-	opts := options{path: ".", dbPath: defaultDB()}
+	opts := options{path: ".", dbPath: defaultDB(), scope: "all"}
 	paths, err := positional(newFlagSet(name, &opts), args)
 	if errors.Is(err, flag.ErrHelp) {
 		fmt.Print(usage)
@@ -52,6 +55,9 @@ func parseArgs(name string, args []string) (options, int) {
 	if code := resolveBy(&opts); code != exitClear {
 		return opts, code
 	}
+	if code := resolveScope(&opts); code != exitClear {
+		return opts, code
+	}
 	return opts, resolveFail(&opts)
 }
 
@@ -66,6 +72,24 @@ func resolveBy(opts *options) int {
 	return exitUsage
 }
 
+// resolveScope validates -scope and stores which findings survive it on the
+// options. prod, dev and all are the only values sweep understands; anything
+// else is a usage error and stops the invocation.
+func resolveScope(opts *options) int {
+	switch opts.scope {
+	case "prod":
+		opts.scopeFilter = finding.FilterProd
+	case "dev":
+		opts.scopeFilter = finding.FilterDev
+	case "all":
+		opts.scopeFilter = finding.FilterAll
+	default:
+		fmt.Fprintf(os.Stderr, "douane: unknown -scope value %q\n", opts.scope)
+		return exitUsage
+	}
+	return exitClear
+}
+
 // newFlagSet declares the flags. Its usage function is empty on purpose: the
 // flag package would list flags that carry no help text of their own, and the
 // usage block above is where douane documents itself.
@@ -76,6 +100,7 @@ func newFlagSet(name string, opts *options) *flag.FlagSet {
 	fs.StringVar(&opts.format, "format", "auto", "")
 	fs.StringVar(&opts.by, "by", "fix", "")
 	fs.StringVar(&opts.failOn, "fail", "never", "")
+	fs.StringVar(&opts.scope, "scope", "all", "")
 	fs.StringVar(&opts.dbPath, "db", opts.dbPath, "")
 	fs.BoolVar(&opts.noEnrich, "no-enrich", false, "")
 	fs.BoolVar(&opts.refresh, "refresh", false, "")
