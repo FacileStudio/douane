@@ -50,4 +50,4 @@ disabled:
   # a habit.
   - gen.line.long
 
-failOn: error
+failOn: info
