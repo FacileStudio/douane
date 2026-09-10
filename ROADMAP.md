@@ -90,7 +90,7 @@ still necessary and no longer urgent.
 **3816 findings · 463 distinct advisories · 315 fleet fix groups · 250 (repo, package) bumps ·
 0 on KEV.**
 
-Measured on **lucy** over the 65 working copies in `~/Projects/Facile/Code`, enriched, 32s warm,
+Measured on **lucy** over the 65 working copies in `~/Code/Facile`, enriched, 32s warm,
 `douane 0.2.2`. Ecosystems: Go 2003, npm 1672, crates.io 141. Severity: 1707 medium, 1632 high,
 218 low, 136 critical, 123 unknown. 87 findings have no fix. 45 gaps: 43 severity, 2 unsupported.
 Five repos already print zero lines: `ardoise-cli`, `authentik-config`, `croc`, `perception-js`,
