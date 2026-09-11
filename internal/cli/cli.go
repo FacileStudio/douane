@@ -30,6 +30,10 @@ Flags:
                                 exit 1 at or above (default never)
   -scope  all|prod|dev          filter findings by how far they reach a runtime
                                 (default all)
+  -informational warn|fail|ignore
+                                treat RUSTSEC informational defects (unmaintained,
+                                unsound) as warnings, CI failures, or hide them
+                                (default warn)
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
@@ -129,6 +133,7 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 	}
 	finding.Rank(report.Findings)
 	report.Findings = finding.FilterScope(report.Findings, opts.scopeFilter)
+	report.Findings = finding.FilterInformational(report.Findings, opts.informational == "ignore")
 	record(st, &report)
 	return report, exitClear
 }

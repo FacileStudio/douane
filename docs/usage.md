@@ -11,6 +11,8 @@ Defaults to the current directory.
 |---|---|---|---|
 | `-format` | `auto`, `text`, `line`, `json` | `auto` | Output shape |
 | `-fail` | `never`, `any`, `low`, `medium`, `high`, `critical`, `kev` | `never` | Exit 1 at or above |
+| `-scope` | `all`, `prod`, `dev` | `all` | Filter findings by how far they reach a runtime |
+| `-informational` | `warn`, `fail`, `ignore` | `warn` | How to treat RUSTSEC informational defects |
 | `-db` | path, or `""` | `~/.douane.db` | Sweep history; `""` disables it |
 | `-no-enrich` | — | off | Skip the KEV and EPSS feeds |
 | `-refresh` | — | off | Refetch the feeds, ignoring the cache |
@@ -22,6 +24,12 @@ The path may be given before or after the flags, so `douane scan -fail high /rep
 axis is not the question, such as a repo you intend to keep at zero findings. `-fail kev`
 is refused under `-no-enrich`, because with the KEV feed off every finding reads
 not-exploited and the gate would pass having evaluated nothing.
+
+`-informational` handles RUSTSEC's informational advisories — defects like "unmaintained" or
+"unsound" that are not exploitable vulnerabilities. The default `warn` shows them as their own
+tier but keeps them out of the exit code entirely, so an unmaintained crate no longer trips
+`-fail any`. `fail` escalates them into the gate. `ignore` hides them from the report as well.
+These carry no severity, so a `fail` without `-informational fail` is never their gate.
 
 `douane --version` prints one line, `douane <version>`, and exits 0. The version is the
 tag the binary was built from, or the commit when it was built from an untagged tree.

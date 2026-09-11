@@ -89,6 +89,27 @@ func TestFetchGapsWhenNothingInTheClosureRates(t *testing.T) {
 	}
 }
 
+// An unmaintained crate carries no severity because none is the correct
+// answer, not because douane failed to find one. The measured fleet put 32 of
+// its 43 severity gaps on exactly this: reporting a non-problem as "incomplete"
+// is a gap that reads as something to fix.
+func TestFetchDoesNotGapAnInformationalAdvisory(t *testing.T) {
+	info := Vuln{ID: "RUSTSEC-2025-0010",
+		Affected: []Affected{{Package: PackageRef{Name: "ring", Ecosystem: "crates.io"},
+			DatabaseSpecific: AffectedDatabaseSpecific{Informational: "unmaintained"}}}}
+	c, _ := osvVulnServer(t, map[string]Vuln{info.ID: info})
+	out, gaps, err := c.Fetch(context.Background(), []string{info.ID})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %v, want none — informational is an answer, not a hole", gaps)
+	}
+	if sev, _ := Severity(out[info.ID]); sev != finding.SevUnknown {
+		t.Fatalf("severity = %v, want UNKNOWN, the category carries no rating", sev)
+	}
+}
+
 func TestFetchLeavesARatedClosureAlone(t *testing.T) {
 	c, hits := osvVulnServer(t, osvChiRecords())
 	if _, _, err := c.Fetch(context.Background(), []string{"GHSA-rjr7-jggh-pgcp"}); err != nil {

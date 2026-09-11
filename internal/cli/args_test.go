@@ -138,6 +138,59 @@ func TestParseArgsRejectsAnUnknownLayout(t *testing.T) {
 	}
 }
 
+func TestParseArgsAcceptsInformationalModes(t *testing.T) {
+	cliQuiet(t)
+	cases := []struct{name string; want bool; flag bool}{
+		{"warn", false, true},
+		{"fail", true, true},
+		{"ignore", false, true},
+		{"default", false, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			args := []string{"/target"}
+			if c.flag {
+				args = []string{"-informational", c.name, "/target"}
+			}
+			opts, code := parseArgs("scan", args)
+			if code != exitClear || opts.fail.info != c.want {
+				t.Fatalf("info = %t code = %d, want %t %d (mode %s)", opts.fail.info, code, c.want, exitClear, c.name)
+			}
+		})
+	}
+}
+
+func TestParseArgsRejectsAnUnknownInformational(t *testing.T) {
+	cliQuiet(t)
+	if _, code := parseArgs("scan", []string{"-informational", "shout"}); code != exitUsage {
+		t.Fatalf("code = %d, want %d", code, exitUsage)
+	}
+}
+
+func TestWarnNeverFailsOnInformational(t *testing.T) {
+	info := finding.Finding{ID: "RUSTSEC-2025-0010", Informational: "unmaintained"}
+	if shouldFail([]finding.Finding{info}, threshold{any: true}) {
+		t.Fatalf("shouldFail = true: -informational warn must keep an unmaintained crate out of the gate even under -fail any")
+	}
+}
+
+func TestFailModeTripsTheGateOnInformational(t *testing.T) {
+	info := finding.Finding{ID: "RUSTSEC-2025-0010", Informational: "unsound"}
+	if !shouldFail([]finding.Finding{info}, threshold{severity: finding.SevHigh, info: true}) {
+		t.Fatalf("shouldFail = false: -informational fail must escalate an informational defect to -fail high")
+	}
+	if shouldFail([]finding.Finding{info}, threshold{never: true, info: true}) {
+		t.Fatalf("shouldFail = true: -fail never wins even with -informational fail")
+	}
+}
+
+func TestFailModeStillLeavesRealFindingsGating(t *testing.T) {
+	info := finding.Finding{ID: "RUSTSEC-2025-0010", Informational: "unmaintained", Severity: finding.SevHigh}
+	if !shouldFail([]finding.Finding{info}, threshold{severity: finding.SevHigh}) {
+		t.Fatalf("shouldFail = false: an informational that also carries a real severity still gates on that severity")
+	}
+}
+
 func TestExitForRanksFindingsOverAnIncompleteScan(t *testing.T) {
 	gaps := []finding.Gap{{Kind: finding.GapUpstream, Subject: "kev", Detail: "429"}}
 	high := []finding.Finding{{Severity: finding.SevHigh}}

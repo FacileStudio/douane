@@ -106,6 +106,7 @@ type Finding struct {
 	Exploit   Exploit  `json:"exploit"`
 	Target    string   `json:"target"`
 	Sources   []string `json:"sources"`
+	Informational string `json:"informational,omitempty"`
 }
 
 // HasFix reports whether an upgrade path out of this finding exists at all.

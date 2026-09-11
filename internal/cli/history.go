@@ -23,11 +23,14 @@ const (
 // threshold is what -fail was set to. It is a type rather than a magic int
 // because "fail on anything" and "fail only on KEV" are not points on the
 // severity scale and pretending otherwise is how they got compared with <.
+// info carries -informational: true means an informational defect trips the
+// gate, false means the gate never sees it.
 type threshold struct {
 	severity finding.Severity
 	kev      bool
 	any      bool
 	never    bool
+	info     bool
 }
 
 // history marks findings unseen by the previous sweep of this target and
@@ -93,12 +96,15 @@ func shouldFail(fs []finding.Finding, t threshold) bool {
 		return false
 	}
 	for _, f := range fs {
+		if f.Informational != "" && !t.info && f.Severity == finding.SevUnknown {
+			continue
+		}
 		switch {
 		case t.any:
 			return true
 		case t.kev && f.Exploit.KEV:
 			return true
-		case !t.kev && f.Severity >= t.severity:
+		case !t.kev && ((t.info && f.Informational != "") || f.Severity >= t.severity):
 			return true
 		}
 	}

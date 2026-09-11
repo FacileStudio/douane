@@ -28,6 +28,9 @@ func writeGroup(w io.Writer, th theme, g finding.Group) {
 		arrow = " " + th.dim(th.To) + " " + th.warn("no fix")
 	}
 	flags := groupBadge(th, g, worst)
+	if worst.Informational != "" {
+		flags += " " + th.warn("("+worst.Informational+")")
+	}
 	if worst.Exploit.Scope == finding.ScopeDev {
 		flags += " " + th.dim("(dev)")
 	}

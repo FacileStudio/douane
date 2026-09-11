@@ -23,6 +23,7 @@ type options struct {
 	dbPath      string
 	scope       string
 	scopeFilter finding.ScopeFilter
+	informational string
 	noEnrich    bool
 	refresh     bool
 	done        bool
@@ -33,7 +34,7 @@ type options struct {
 // natural CI line, and reading it only from the front made that one scan $PWD
 // while reporting success.
 func parseArgs(name string, args []string) (options, int) {
-	opts := options{path: ".", dbPath: defaultDB(), scope: "all"}
+	opts := options{path: ".", dbPath: defaultDB(), scope: "all", informational: "warn"}
 	paths, err := positional(newFlagSet(name, &opts), args)
 	if errors.Is(err, flag.ErrHelp) {
 		fmt.Print(usage)
@@ -58,7 +59,10 @@ func parseArgs(name string, args []string) (options, int) {
 	if code := resolveScope(&opts); code != exitClear {
 		return opts, code
 	}
-	return opts, resolveFail(&opts)
+	if code := resolveFail(&opts); code != exitClear {
+		return opts, code
+	}
+	return opts, resolveInformational(&opts)
 }
 
 // resolveBy turns -by into the layout output renders. fix groups findings by
@@ -90,6 +94,23 @@ func resolveScope(opts *options) int {
 	return exitClear
 }
 
+// resolveInformational validates -informational and folds it onto the fail
+// threshold. warn keeps informational findings out of the exit code entirely;
+// fail makes them trip whatever the non-never non-kev threshold is; ignore
+// hides them from the report as well. The threshold.info flag is how shouldFail
+// tells warn from fail without re-parsing the string on every finding.
+func resolveInformational(opts *options) int {
+	switch opts.informational {
+	case "warn", "fail":
+		opts.fail.info = opts.informational == "fail"
+		return exitClear
+	case "ignore":
+		return exitClear
+	}
+	fmt.Fprintf(os.Stderr, "douane: unknown -informational value %q\n", opts.informational)
+	return exitUsage
+}
+
 // newFlagSet declares the flags. Its usage function is empty on purpose: the
 // flag package would list flags that carry no help text of their own, and the
 // usage block above is where douane documents itself.
@@ -101,6 +122,7 @@ func newFlagSet(name string, opts *options) *flag.FlagSet {
 	fs.StringVar(&opts.by, "by", "fix", "")
 	fs.StringVar(&opts.failOn, "fail", "never", "")
 	fs.StringVar(&opts.scope, "scope", "all", "")
+	fs.StringVar(&opts.informational, "informational", "warn", "")
 	fs.StringVar(&opts.dbPath, "db", opts.dbPath, "")
 	fs.BoolVar(&opts.noEnrich, "no-enrich", false, "")
 	fs.BoolVar(&opts.refresh, "refresh", false, "")

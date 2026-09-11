@@ -22,6 +22,25 @@ func TestHasFixDistinguishesNoFixFromUntakenFix(t *testing.T) {
 	}
 }
 
+func TestFilterInformationalKeepsRealVulnerabilities(t *testing.T) {
+	fs := []Finding{
+		{ID: "CVE-1", Severity: SevHigh},
+		{ID: "RUSTSEC-2025-0010", Informational: "unmaintained"},
+		{ID: "RUSTSEC-2025-0002", Informational: "unsound"},
+	}
+	kept := FilterInformational(fs, true)
+	if len(kept) != 1 || kept[0].ID != "CVE-1" {
+		t.Fatalf("kept %v, want only the scoring vulnerability", kept)
+	}
+}
+
+func TestFilterInformationalKeepsEverythingByDefault(t *testing.T) {
+	fs := []Finding{{ID: "RUSTSEC-2025-0010", Informational: "unmaintained"}}
+	if got := FilterInformational(fs, false); len(got) != 1 {
+		t.Fatalf("kept %v, want everything — ignore is opt-in, never the default", got)
+	}
+}
+
 // TestSameLine pins the boundary a rebuild claim rests on: only a fix on the
 // line the image already builds from is reachable without editing a version.
 func TestSameLine(t *testing.T) {

@@ -31,7 +31,9 @@ limits:
   returns: 3
   nesting: 4            # filet's own default
   complexity: 10        # filet's own default
-  structFields: 12      # filet's own default
+  structFields: 13      # 12 is filet's default; 13 lets Finding carry informational defect
+                        # categories alongside severity (v2.4). Informational is orthogonal to
+                        # Exploit and Severity, and folding it into either would lie about what it is.
   interfaceMethods: 4   # filet's own default
 
 architecture:

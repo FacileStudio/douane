@@ -25,7 +25,7 @@ That gap is the roadmap, and the shape of it is now known rather than guessed:
 |---|---|---|
 | ~~Go stdlib and toolchain~~ | ~~1879 (49%)~~ | **done 2026-08-29.** v1.8 reads the builder image; 787 are a rebuild |
 | npm reachable only from `devDependencies` | 523 of 1371 classified (38%) | v2.3 |
-| RUSTSEC informational, not vulnerabilities | 77 of 141 crates findings (55%) | v2.4 |
+| ~~RUSTSEC informational, not vulnerabilities~~ | ~~77 of 141 crates findings (55%)~~ | **done 2026-09-11.** `-informational` splits the warning tier |
 | Go dependencies that are not the toolchain | 124 | v2.1 |
 
 Read that table before picking up any milestone. **Half of the number this roadmap is
@@ -174,7 +174,8 @@ Evidence, not milestone numbers, sets this. Reordered 2026-08-28 against the v0.
 8. ~~**v2.3** dev-only dependencies~~, shipped 2026-09-10 as v0.5.0. The offline graph walk
    separated a 2697-finding fleet into 2392 prod and 305 dev with no leakage. Now the largest cut
    douane itself can make is done; the running mate remains.
-9. **v2.4** informational advisories. 77 findings, one field.
+9. ~~**v2.4** informational advisories~~, shipped 2026-09-11. 77 findings, one field, and
+   the fleet's 32 fake severity gaps with it.
 10. **v5.1** the nightly daemon. The trigger the tool was built for, and the only one that
     matches how the answer changes. Do it once the count is survivable, not before.
 11. **v3** deployed-or-not. Still the sharpest judgment axis, and now the one that separates the

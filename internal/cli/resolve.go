@@ -60,18 +60,19 @@ func newFinding(v osv.Vuln, pkg finding.Package, absent map[string]bool) finding
 	canonical, aliases := osv.Canonical(v, absent)
 	sev, vector := osv.Severity(v)
 	return finding.Finding{
-		ID:        canonical,
-		Aliases:   aliases,
-		Summary:   v.Summary,
-		Severity:  sev,
-		CVSS:      vector,
-		Package:   pkg.Name,
-		Ecosystem: pkg.Ecosystem,
-		Installed: pkg.Version,
-		FixedIn:   osv.FixedIn(v, pkg),
-		Target:    pkg.Source,
-		Sources:   []string{"osv"},
-		Exploit:   finding.Exploit{Scope: pkg.Scope},
+		ID:            canonical,
+		Aliases:       aliases,
+		Summary:       v.Summary,
+		Severity:      sev,
+		CVSS:          vector,
+		Package:       pkg.Name,
+		Ecosystem:     pkg.Ecosystem,
+		Installed:     pkg.Version,
+		FixedIn:       osv.FixedIn(v, pkg),
+		Target:        pkg.Source,
+		Sources:       []string{"osv"},
+		Exploit:       finding.Exploit{Scope: pkg.Scope},
+		Informational: osv.Informational(v),
 	}
 }
 

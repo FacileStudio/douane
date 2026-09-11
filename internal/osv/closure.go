@@ -152,12 +152,18 @@ func stamp(held map[string]Vuln, group []string, label string, score SeveritySco
 
 // severityGaps reports the requested advisories no member of their closure
 // could rate. An unrated finding sits below every -fail threshold, so without
-// this the CI gate passes over it in silence.
+// this the CI gate passes over it in silence. Informational advisories are
+// skipped: an unmaintained crate carries no severity because no severity is the
+// correct answer, not because douane failed to find one, so raising a gap
+// would report a non-problem as incomplete.
 func severityGaps(held map[string]Vuln, want []string, absent map[string]bool) []finding.Gap {
 	var gaps []finding.Gap
 	for _, id := range want {
 		v, ok := held[id]
 		if !ok {
+			continue
+		}
+		if IsInformational(v) {
 			continue
 		}
 		if sev, _ := Severity(v); sev != finding.SevUnknown {

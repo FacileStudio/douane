@@ -85,3 +85,31 @@ func TestSeverityOutranksScopeDemotion(t *testing.T) {
 		t.Fatalf("ranked %s first: severity must dominate scope, dev stays above a lower severity", fs[0].ID)
 	}
 }
+
+func TestInformationalSortsBelowRatedAtEqualSeverity(t *testing.T) {
+	e := finding.Exploit{EPSS: 0.5, EPSSKnown: true}
+	info := rankOne("RUSTSEC-2025-0010", "ring", finding.SevUnknown, e)
+	info.Informational = "unmaintained"
+	vuln := rankOne("RUSTSEC-2025-0001", "ring", finding.SevUnknown, e)
+
+	if !finding.Less(vuln, info) || finding.Less(info, vuln) {
+		t.Fatalf("an unrated vulnerability must rank before an informational defect at equal severity")
+	}
+	fs := []finding.Finding{info, vuln}
+	finding.Rank(fs)
+	if fs[0].ID != "RUSTSEC-2025-0001" {
+		t.Fatalf("ranked %s first: informational must never outrank a scored vulnerability", fs[0].ID)
+	}
+}
+
+func TestInformationalDoesNotDemoteBelowSeverity(t *testing.T) {
+	info := rankOne("RUSTSEC-2025-0010", "ring", finding.SevHigh, finding.Exploit{EPSS: 0.5, EPSSKnown: true})
+	info.Informational = "unsound"
+	vuln := rankOne("RUSTSEC-2025-0001", "ring", finding.SevLow, finding.Exploit{EPSS: 0.5, EPSSKnown: true})
+
+	fs := []finding.Finding{vuln, info}
+	finding.Rank(fs)
+	if fs[0].ID != "RUSTSEC-2025-0010" {
+		t.Fatalf("ranked %s first: an informational HIGH must still beat a rated LOW — the marker demotes within a severity, not across it", fs[0].ID)
+	}
+}

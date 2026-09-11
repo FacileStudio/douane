@@ -23,10 +23,19 @@ type PackageRef struct {
 	Ecosystem string `json:"ecosystem"`
 }
 
+// AffectedDatabaseSpecific carries the source-database fields that sit on one
+// affected entry. Informational is the RUSTSEC category that marks an advisory
+// as a defect rather than an exploitable vulnerability — "unmaintained" or
+// "unsound" — and its presence is the whole signal.
+type AffectedDatabaseSpecific struct {
+	Informational string `json:"informational"`
+}
+
 // Affected ties a package to the version ranges an advisory covers.
 type Affected struct {
-	Package PackageRef `json:"package"`
-	Ranges  []Range    `json:"ranges"`
+	Package PackageRef             `json:"package"`
+	Ranges  []Range                `json:"ranges"`
+	DatabaseSpecific AffectedDatabaseSpecific `json:"database_specific"`
 }
 
 // SeverityScore is one scoring of an advisory, such as a CVSS vector.

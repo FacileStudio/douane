@@ -43,3 +43,22 @@ func FilterScope(fs []Finding, f ScopeFilter) []Finding {
 	}
 	return out
 }
+
+// FilterInformational drops informational findings when ignore is true. The
+// default warn and fail modes keep them — warn so the report still shows what
+// to watch, fail so the gate can escalate them — and only ignore hides them
+// from the output entirely. It is opt-in, never the default, because an
+// unmaintained crate that disappears from the report also disappears from the
+// decision to migrate.
+func FilterInformational(fs []Finding, ignore bool) []Finding {
+	if !ignore {
+		return fs
+	}
+	out := make([]Finding, 0, len(fs))
+	for _, x := range fs {
+		if x.Informational == "" {
+			out = append(out, x)
+		}
+	}
+	return out
+}

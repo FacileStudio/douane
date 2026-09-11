@@ -72,6 +72,9 @@ func badge(th theme, f finding.Finding, isNew bool) string {
 	if !f.HasFix() {
 		flags = append(flags, th.warn("NO FIX"))
 	}
+	if f.Informational != "" {
+		flags = append(flags, th.warn(f.Informational))
+	}
 	if len(flags) == 0 {
 		return ""
 	}
@@ -111,11 +114,19 @@ func writeSummary(w io.Writer, th theme, r Report, n int) {
 }
 
 // spread renders the severity distribution, dropping the tiers that are empty
-// so a clean-ish scan does not print four zeroes.
+// so a clean-ish scan does not print four zeroes. Informational findings form
+// their own tier: they are shown, never failing, and folding them into the
+// UNKNOWN count would claim they went unrated when they were never meant to be
+// rated.
 func spread(th theme, fs []finding.Finding) string {
 	counts := map[finding.Severity]int{}
 	kev := 0
+	info := 0
 	for _, f := range fs {
+		if f.Informational != "" {
+			info++
+			continue
+		}
 		counts[f.Severity]++
 		if f.Exploit.KEV {
 			kev++
@@ -127,6 +138,9 @@ func spread(th theme, fs []finding.Finding) string {
 		if n := counts[s]; n > 0 {
 			parts = append(parts, th.mark(s, fmt.Sprintf("%d %s", n, strings.ToLower(s.String()))))
 		}
+	}
+	if info > 0 {
+		parts = append(parts, th.warn(fmt.Sprintf("%d informational", info)))
 	}
 	if kev > 0 {
 		parts = append(parts, th.alarm(fmt.Sprintf("%d known exploited", kev)))
