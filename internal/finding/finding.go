@@ -94,19 +94,19 @@ type Exploit struct {
 // Finding is one vulnerability affecting one package, after alias resolution
 // and enrichment. It is the only shape the rest of douane passes around.
 type Finding struct {
-	ID        string   `json:"id"`
-	Aliases   []string `json:"aliases,omitempty"`
-	Summary   string   `json:"summary"`
-	Severity  Severity `json:"severity"`
-	CVSS      string   `json:"cvss,omitempty"`
-	Package   string   `json:"package"`
-	Ecosystem string   `json:"ecosystem"`
-	Installed string   `json:"installed"`
-	FixedIn   string   `json:"fixed_in"`
-	Exploit   Exploit  `json:"exploit"`
-	Target    string   `json:"target"`
-	Sources   []string `json:"sources"`
-	Informational string `json:"informational,omitempty"`
+	ID            string   `json:"id"`
+	Aliases       []string `json:"aliases,omitempty"`
+	Summary       string   `json:"summary"`
+	Severity      Severity `json:"severity"`
+	CVSS          string   `json:"cvss,omitempty"`
+	Package       string   `json:"package"`
+	Ecosystem     string   `json:"ecosystem"`
+	Installed     string   `json:"installed"`
+	FixedIn       string   `json:"fixed_in"`
+	Exploit       Exploit  `json:"exploit"`
+	Target        string   `json:"target"`
+	Sources       []string `json:"sources"`
+	Informational string   `json:"informational,omitempty"`
 }
 
 // HasFix reports whether an upgrade path out of this finding exists at all.

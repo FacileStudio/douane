@@ -15,18 +15,18 @@ import (
 // that finished during parsing: -h prints the usage and leaves nothing to
 // scan, so asking for help still exits 0.
 type options struct {
-	path        string
-	format      string
-	by          string
-	failOn      string
-	fail        threshold
-	dbPath      string
-	scope       string
-	scopeFilter finding.ScopeFilter
+	path          string
+	format        string
+	by            string
+	failOn        string
+	fail          threshold
+	dbPath        string
+	scope         string
+	scopeFilter   finding.ScopeFilter
 	informational string
-	noEnrich    bool
-	refresh     bool
-	done        bool
+	noEnrich      bool
+	refresh       bool
+	done          bool
 }
 
 // parseArgs reads the flags and the single optional path. The path is taken

@@ -33,8 +33,8 @@ type AffectedDatabaseSpecific struct {
 
 // Affected ties a package to the version ranges an advisory covers.
 type Affected struct {
-	Package PackageRef             `json:"package"`
-	Ranges  []Range                `json:"ranges"`
+	Package          PackageRef               `json:"package"`
+	Ranges           []Range                  `json:"ranges"`
 	DatabaseSpecific AffectedDatabaseSpecific `json:"database_specific"`
 }
 

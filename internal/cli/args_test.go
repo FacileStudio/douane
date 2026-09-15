@@ -140,7 +140,11 @@ func TestParseArgsRejectsAnUnknownLayout(t *testing.T) {
 
 func TestParseArgsAcceptsInformationalModes(t *testing.T) {
 	cliQuiet(t)
-	cases := []struct{name string; want bool; flag bool}{
+	cases := []struct {
+		name string
+		want bool
+		flag bool
+	}{
 		{"warn", false, true},
 		{"fail", true, true},
 		{"ignore", false, true},

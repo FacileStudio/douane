@@ -23,7 +23,7 @@ func TestInformationalReadsAcrossAffectedEntries(t *testing.T) {
 
 func TestInformationalEmptyWhenNoMarker(t *testing.T) {
 	v := Vuln{
-		ID: "GHSA-259r-337f-4rfw",
+		ID:       "GHSA-259r-337f-4rfw",
 		Affected: []Affected{{Package: PackageRef{Name: "x", Ecosystem: "npm"}}},
 	}
 	if got := Informational(v); got != "" {
