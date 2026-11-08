@@ -1,6 +1,9 @@
 package finding
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"slices"
+)
 
 // Severity is the coarse impact rating carried by an advisory.
 type Severity int
@@ -113,7 +116,25 @@ type Finding struct {
 // An empty FixedIn is a different decision from an available-but-untaken fix.
 func (f Finding) HasFix() bool { return f.FixedIn != "" }
 
-// Key identifies a finding uniquely within one sweep.
+// Names lists every identifier the flaw goes by, sorted and without repeats.
+func (f Finding) Names() []string {
+	names := append([]string{f.ID}, f.Aliases...)
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
+// Key identifies a finding across sweeps. It is built from the smallest name
+// the flaw has rather than from the identifier douane chose to report it
+// under, because that choice moves: OSV answering 404 for a CVE twin on one run
+// and a record on the next flips the report between the CVE and its GHSA alias,
+// and a key that followed it read every flip as one finding resolved and one
+// new.
 func (f Finding) Key() string {
-	return f.Ecosystem + "|" + f.Package + "|" + f.Installed + "|" + f.ID
+	return f.KeyAs(f.Names()[0])
+}
+
+// KeyAs is the key this finding would carry if it were filed under name. It
+// reads history written before Key stopped following the reported identifier.
+func (f Finding) KeyAs(name string) string {
+	return f.Ecosystem + "|" + f.Package + "|" + f.Installed + "|" + name
 }
