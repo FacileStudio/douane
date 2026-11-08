@@ -43,11 +43,27 @@ func history(st *store.Store, report *output.Report) error {
 		return err
 	}
 	for _, f := range report.Findings {
-		if !previous[f.Key()] {
+		if !seenBefore(previous, f) {
 			report.New[f.Key()] = true
 		}
 	}
 	return st.Save(report.Target, report.Packages, report.Findings)
+}
+
+// seenBefore reports whether the previous sweep held this flaw under any of its
+// names. A history written before keys stopped following the reported
+// identifier holds the flaw under whichever name won that night, and reading
+// only today's key would call every such finding new once.
+func seenBefore(previous map[string]bool, f finding.Finding) bool {
+	if previous[f.Key()] {
+		return true
+	}
+	for _, name := range f.Names() {
+		if previous[f.KeyAs(name)] {
+			return true
+		}
+	}
+	return false
 }
 
 // record files this run so the next one can say what is new. A history that

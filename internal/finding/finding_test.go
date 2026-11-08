@@ -62,3 +62,32 @@ func TestSameLine(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyIgnoresWhichAliasWon(t *testing.T) {
+	asCVE := Finding{Ecosystem: "npm", Package: "devalue", Installed: "5.8.0",
+		ID: "CVE-2026-123565", Aliases: []string{"GHSA-mcm9-63f2-9j32"}}
+	asGHSA := Finding{Ecosystem: "npm", Package: "devalue", Installed: "5.8.0",
+		ID: "GHSA-mcm9-63f2-9j32", Aliases: []string{"CVE-2026-123565"}}
+
+	if asCVE.Key() != asGHSA.Key() {
+		t.Fatalf("keys differ: %q vs %q — a flip would read as one resolved and one new",
+			asCVE.Key(), asGHSA.Key())
+	}
+}
+
+func TestKeyWithoutAliasesIsTheID(t *testing.T) {
+	f := Finding{Ecosystem: "Go", Package: "stdlib", Installed: "1.26", ID: "CVE-2026-39821"}
+
+	if got, want := f.Key(), "Go|stdlib|1.26|CVE-2026-39821"; got != want {
+		t.Fatalf("key = %q, want %q — keys already on disk would stop matching", got, want)
+	}
+}
+
+func TestKeyKeepsDifferentFlawsApart(t *testing.T) {
+	a := Finding{Ecosystem: "npm", Package: "devalue", Installed: "5.8.0", ID: "CVE-2026-1"}
+	b := Finding{Ecosystem: "npm", Package: "devalue", Installed: "5.8.0", ID: "CVE-2026-2"}
+
+	if a.Key() == b.Key() {
+		t.Fatalf("two flaws share the key %q", a.Key())
+	}
+}
