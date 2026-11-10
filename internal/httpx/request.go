@@ -19,13 +19,21 @@ func (c *Client) JSON(ctx context.Context, method, url string, body []byte, out 
 	})
 }
 
-// Bytes sends a GET and returns the whole body, bounded by the client's limit.
+// Bytes sends a GET and returns the whole body. A body over the client's limit
+// is an error rather than a silently shortened answer: a line-based feed cut at
+// the limit would parse cleanly and lose its tail.
 func (c *Client) Bytes(ctx context.Context, url string) ([]byte, error) {
 	var out []byte
 	err := c.do(ctx, http.MethodGet, url, nil, func(r io.Reader) error {
 		b, err := io.ReadAll(r)
+		if err != nil {
+			return err
+		}
+		if int64(len(b)) > c.maxBody {
+			return fmt.Errorf("response body exceeds %d bytes", c.maxBody)
+		}
 		out = b
-		return err
+		return nil
 	})
 	return out, err
 }
@@ -76,7 +84,7 @@ func (c *Client) attempt(ctx context.Context, method, url string, body []byte, r
 	if resp.StatusCode/100 != 2 {
 		return c.statusError(resp, url)
 	}
-	if err := read(io.LimitReader(resp.Body, c.maxBody)); err != nil {
+	if err := read(io.LimitReader(resp.Body, c.maxBody+1)); err != nil {
 		return fmt.Errorf("%s: %w", url, err)
 	}
 	return nil
