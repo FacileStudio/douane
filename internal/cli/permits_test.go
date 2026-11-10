@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,14 +16,19 @@ import (
 
 func cliStderr(t *testing.T, run func()) string {
 	t.Helper()
+	return capture(t, &os.Stderr, run)
+}
+
+func capture(t *testing.T, target **os.File, run func()) string {
+	t.Helper()
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	saved := os.Stderr
-	os.Stderr = w
+	saved := *target
+	*target = w
 	run()
-	os.Stderr = saved
+	*target = saved
 	w.Close()
 	out, _ := io.ReadAll(r)
 	r.Close()
@@ -32,7 +38,7 @@ func cliStderr(t *testing.T, run func()) string {
 func TestScanRefusesAPermitWithoutExpiry(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\ngo 1.25.0\n")
-	write(t, filepath.Join(dir, permit.FileName), "permits:\n  - id: GO-2026-1\n    reason: not reachable\n")
+	write(t, filepath.Join(dir, permit.FileName), permitMissingExpiry)
 	code := exitClear
 	stderr := cliStderr(t, func() { code = Run([]string{"scan", "-db", "", "-no-enrich", dir}) })
 	if code != exitUsage {
@@ -97,10 +103,95 @@ func TestSweepPermitsApplyToTheirOwnRepoOnly(t *testing.T) {
 		{report: output.Report{Target: filepath.Join(root, "a")}},
 		{report: output.Report{Target: filepath.Join(root, "b")}},
 	}
-	if !attachPermits(repos, permit.Today()) {
-		t.Fatal("attachPermits refused a valid file")
-	}
-	if len(repos[0].permits) != 1 || len(repos[1].permits) != 0 {
+	attachPermits(repos, permit.Today())
+	if len(repos[0].permits) != 1 || len(repos[1].permits) != 0 || len(repos[0].report.Gaps) != 0 {
 		t.Fatalf("permits = %d and %d, want a's file to stay in a", len(repos[0].permits), len(repos[1].permits))
+	}
+}
+
+const permitMissingExpiry = "permits:\n  - id: GO-2026-1\n    reason: not reachable\n"
+
+const emptyLock = `{"lockfileVersion": 3, "packages": {"": {"name": "x"}}}`
+
+type sweepJSON struct {
+	Complete bool       `json:"complete"`
+	Repos    []repoJSON `json:"repos"`
+}
+
+type repoJSON struct {
+	Name     string        `json:"name"`
+	Complete bool          `json:"complete"`
+	Failed   bool          `json:"failed"`
+	Gaps     []finding.Gap `json:"gaps"`
+}
+
+func runJSONSweep(t *testing.T, root string) (int, sweepJSON, string) {
+	t.Helper()
+	code := exitClear
+	var stdout string
+	stderr := cliStderr(t, func() {
+		stdout = capture(t, &os.Stdout, func() {
+			code = Run([]string{"sweep", "-db", "", "-no-enrich", "-format", "json", "-fail", "any", root})
+		})
+	})
+	var got sweepJSON
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
+	}
+	return code, got, stderr
+}
+
+func checkPermitGapRepo(t *testing.T, r repoJSON, where string) {
+	t.Helper()
+	if r.Name == "good" {
+		if !r.Complete || r.Failed || len(r.Gaps) != 0 {
+			t.Fatalf("good = %+v, want it swept normally", r)
+		}
+		return
+	}
+	if r.Complete || !r.Failed || len(r.Gaps) != 1 || r.Gaps[0].Kind != finding.GapUnreadable ||
+		r.Gaps[0].Subject != permit.FileName || !strings.Contains(r.Gaps[0].Detail, where) {
+		t.Fatalf("bad = %+v, want one unreadable douane.yml gap naming the line", r)
+	}
+}
+
+func TestSweepReportsAnInvalidPermitFileAsAGapAndCarriesOn(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "bad", "package-lock.json"), emptyLock)
+	write(t, filepath.Join(root, "bad", permit.FileName), permitMissingExpiry)
+	write(t, filepath.Join(root, "good", "package-lock.json"), emptyLock)
+	code, got, stderr := runJSONSweep(t, root)
+	if code != exitIncomplete {
+		t.Fatalf("exit = %d, want %d: an invalid douane.yml leaves its repository incomplete", code, exitIncomplete)
+	}
+	where := filepath.Join(root, "bad", permit.FileName) + ":2: permit is missing expires"
+	if !strings.Contains(stderr, where) {
+		t.Fatalf("stderr = %q, want the file and line: %q", stderr, where)
+	}
+	if got.Complete || len(got.Repos) != 2 {
+		t.Fatalf("complete = %v with %d repos, want an incomplete sweep of both", got.Complete, len(got.Repos))
+	}
+	for _, r := range got.Repos {
+		checkPermitGapRepo(t, r, where)
+	}
+}
+
+func TestSweepFindingsOutrankAnInvalidPermitFile(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "bad", permit.FileName), permitMissingExpiry)
+	bad := &repoScan{report: output.Report{Name: "bad", Target: filepath.Join(root, "bad"), New: map[string]bool{}},
+		pkgs: []finding.Package{{Name: "hono", Ecosystem: "npm", Version: "4.0.0"}}}
+	good := &repoScan{report: permitReport()}
+	cliStderr(t, func() { attachPermits([]*repoScan{bad, good}, permit.Today()) })
+	if bad.pkgs != nil {
+		t.Fatal("the repository with an invalid douane.yml kept its packages and would be scanned without its permits")
+	}
+	var sweep output.Sweep
+	collect([]*repoScan{bad, good}, nil, &sweep, finding.FilterAll, "warn")
+	if code := sweepExit(sweep, threshold{severity: finding.SevHigh}); code != exitFindings {
+		t.Fatalf("exit = %d, want %d: findings at -fail outrank the gap", code, exitFindings)
+	}
+	if code := sweepExit(sweep, threshold{severity: finding.SevCritical}); code != exitIncomplete {
+		t.Fatalf("exit = %d, want %d below -fail", code, exitIncomplete)
 	}
 }

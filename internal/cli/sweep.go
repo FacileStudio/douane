@@ -75,9 +75,7 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 		return output.Sweep{}, exitUsage
 	}
 	repos := inventories(dirs)
-	if !attachPermits(repos, permit.Today()) {
-		return output.Sweep{}, exitUsage
-	}
+	attachPermits(repos, permit.Today())
 	sweep := output.Sweep{Root: root}
 	if len(repos) == 0 {
 		sweep.Warnings = append(sweep.Warnings, "no project found under "+root)

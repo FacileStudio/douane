@@ -42,8 +42,8 @@ repository and ranked globally. A directory counts as a repository when it holds
 or a lockfile at its top level; `sweep` does not recurse past that, so a monorepo is one
 repository, not one per app.
 
-Takes the same flags as `scan`. A repository with an unreadable lockfile does not stop the
-others: it is reported, skipped, and counted in the summary. The sweep exits 3 under any
+Takes the same flags as `scan`. A repository with an unreadable lockfile or an invalid
+`douane.yml` does not stop the others: it is reported, skipped, and counted in the summary. The sweep exits 3 under any
 `-fail` but `never`, because a repository that silently leaves the fleet is a false
 negative, not a clean run.
 
@@ -126,7 +126,7 @@ and warnings go to stderr, as in `line` and `json`.
 |---|---|
 | 0 | Clear, or findings below `-fail`, over a complete scan |
 | 1 | Findings at or above `-fail`, or a finding whose permit has lapsed, whatever `-fail` says |
-| 2 | Bad usage, a target douane cannot start from, or an invalid `douane.yml` |
+| 2 | Bad usage, a target douane cannot start from, or an invalid `douane.yml` on `scan` |
 | 3 | Scan incomplete: douane could not determine part of the answer |
 
 **3 is the one to read twice.** `-fail` is a claim about what was found, and douane can
@@ -166,7 +166,7 @@ permits:
 | `expires` | yes | `YYYY-MM-DD`, the last day the permit holds, at most 365 days ahead |
 
 The file is a strict subset of YAML: a top-level `permits:` list of flat `key: value`
-entries, values plain or quoted on one line, `#` comments allowed. douane exits 2 with the
+entries, values plain or quoted on one line, `#` comments allowed. `douane scan` exits 2 with the
 path and line for a missing `id`, `reason` or `expires`, an unknown or repeated key, a date
 that does not parse or lies more than 365 days ahead, or any YAML construct outside that
 subset. It never skips an entry it cannot read, because a skipped permit is a finding its
@@ -184,8 +184,17 @@ renewed by adding a fresh entry. Every permit note goes to stderr in every forma
 included. Permits apply after the history is recorded, so a permitted finding still counts
 as seen and does not read as new on the day its permit lapses.
 
-In a sweep, each repository reads its own `douane.yml` and nothing else. An invalid file in
-any repository stops the sweep with exit 2.
+In a sweep, each repository reads its own `douane.yml` and nothing else. An invalid file costs
+its own repository and nothing else. stderr names the file and line, the repository is
+skipped with `"failed": true` and one `unreadable` gap whose `subject` is `douane.yml` and
+whose `detail` carries the path and line, and every other repository is swept as usual. The
+sweep then exits like any incomplete one: 3, unless findings at or above `-fail` make it 1,
+and 0 under `-fail never`. The repository is skipped rather than scanned without its permits,
+because that would report as held what its author believes is handled.
+
+```
+douane: gap: app: unreadable: douane.yml: /src/app/douane.yml:2: permit is missing expires
+```
 
 ## Gaps
 
@@ -199,7 +208,7 @@ Six kinds, and what each one means when you find it in your output:
 | Kind | What douane is telling you |
 |---|---|
 | `upstream` | An API refused, failed or truncated. The `subject` names the packages or the feed whose answer is missing. |
-| `unreadable` | A lockfile douane recognises and could not parse. The `subject` is the file, relative to the scan root. |
+| `unreadable` | A lockfile douane recognises and could not parse, or, in a sweep, a `douane.yml` it refused. The `subject` is the file, relative to the scan root. |
 | `unsupported` | An ecosystem douane cannot read, such as `pnpm-lock.yaml`, or a project holding no lockfile it recognises at all. Those dependencies were never queried. |
 | `unresolved` | OSV named a vulnerability id but its detail record never arrived, so douane knows a package is vulnerable and nothing else about the flaw. |
 | `severity` | A finding whose severity could not be resolved, so it cannot be compared against a `-fail` threshold. |

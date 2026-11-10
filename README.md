@@ -106,26 +106,29 @@ permits:
 `id` matches any name the finding goes by, CVE, GHSA or the ecosystem's own. `package` is
 optional and narrows the match. `reason` and `expires` are mandatory, and `expires` may be at
 most 365 days ahead: a permit is temporary, and one without an end is how a finding vanishes
-for good. douane refuses a file with a missing field, an unknown key or a bad date with exit 2
-and the line at fault.
+for good. `douane scan` refuses a file with a missing field, an unknown key or a bad date with
+exit 2 and the line at fault.
 
 A valid permit takes its finding out of the output and the `-fail` calculation; JSON lists it
 under `permitted` with its reason. On the day after `expires`, the finding comes back marked
 **EXPIRED PERMIT** and the run exits 1 whatever `-fail` says. Permits expiring within 14 days
 are listed on stderr on every run. In a sweep, each repository's `douane.yml` applies to that
-repository only. Commit the file: the reason and the date are the audit trail.
+repository only, and an invalid one costs that repository alone: it is skipped and reported
+as an `unreadable` gap on `douane.yml` with the line at fault, stderr names the file and line,
+and every other repository is swept as usual. Commit the file: the reason and the date are the audit trail.
 
 ## Exit codes
 
 ```
 0  clear
 1  findings at or above -fail, or a finding whose permit has lapsed
-2  bad usage or unreadable input, an invalid douane.yml included
+2  bad usage or unreadable input, an invalid douane.yml on scan included
 3  scan incomplete — douane could not determine part of the answer
 ```
 
 Permits add no exit code. A lapsed permit is a finding, so it exits 1; an invalid permit file
-is unreadable input, so it exits 2.
+is unreadable input, so `scan` exits 2. In a sweep it is a gap on its repository, so the
+sweep exits 3 unless findings at or above `-fail` make it exit 1.
 
 `-fail` is a claim about what was found, and douane can only make that claim over a
 complete scan. So anything it could not determine exits **3**, never 0: an OSV chunk that

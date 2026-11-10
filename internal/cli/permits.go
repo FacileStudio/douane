@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/output"
 	"github.com/FacileStudio/douane/internal/permit"
 )
@@ -24,16 +25,26 @@ func loadPermits(dir string, today time.Time) ([]permit.Permit, bool) {
 }
 
 // attachPermits gives every repository of a sweep its own douane.yml, and
-// nobody else's: a permit is a decision about one project.
-func attachPermits(repos []*repoScan, today time.Time) bool {
+// nobody else's: a permit is a decision about one project. A repository whose
+// file douane refuses is skipped, its packages dropped and the refusal kept as
+// its gap, so one bad file costs that repository its answer and the fleet
+// nothing: scanning it without its permits would report as held what its
+// author believes is handled.
+func attachPermits(repos []*repoScan, today time.Time) {
 	for _, r := range repos {
-		ps, ok := loadPermits(r.report.Target, today)
-		if !ok {
-			return false
+		ps, err := permit.Load(r.report.Target, today)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "douane: %v\n", err)
+			r.pkgs, r.report.Packages, r.report.Failed = nil, 0, true
+			r.report.Gaps = append(r.report.Gaps, finding.Gap{
+				Kind:    finding.GapUnreadable,
+				Subject: permit.FileName,
+				Detail:  err.Error(),
+			})
+			continue
 		}
 		r.permits = ps
 	}
-	return true
 }
 
 // applyPermits takes the findings a valid permit covers out of the report and
