@@ -42,9 +42,10 @@ func runSweep(args []string) int {
 	return sweepExit(result, opts.fail)
 }
 
-// sweepExit ranks the two ways a fleet run can be bad. A repository that could
-// not be read outranks a finding: an unscannable repository leaves the fleet
-// silently, which is a false negative, and `scan` already exits 2 for it.
+// sweepExit applies exitFor to the whole fleet. Findings at or above -fail exit
+// 1 and outrank everything else, because "you are vulnerable" is a finished
+// answer. Short of that, any gap in the fleet, an unreadable repository
+// included, exits 3, unless -fail is never, which always exits 0.
 func sweepExit(s output.Sweep, t threshold) int {
 	var all []finding.Finding
 	for _, r := range s.Repos {

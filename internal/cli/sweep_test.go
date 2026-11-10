@@ -134,3 +134,23 @@ func TestScanOneCallsAnEmptyTargetAGap(t *testing.T) {
 		t.Fatalf("exitFor under -fail never = %d, want %d", got, exitClear)
 	}
 }
+
+func fleetWithUnreadableRepoAndHighFinding() output.Sweep {
+	unreadable := output.Report{Name: "broken", Gaps: []finding.Gap{{Kind: finding.GapUnreadable, Subject: "go.mod", Detail: "parse error"}}}
+	vulnerable := output.Report{Name: "app", Findings: []finding.Finding{{ID: "CVE-2026-1", Severity: finding.SevHigh}}}
+	return output.Sweep{Repos: []output.Report{unreadable, vulnerable}}
+}
+
+func TestSweepExitRanksAFindingOverAnUnreadableRepo(t *testing.T) {
+	fleet := fleetWithUnreadableRepoAndHighFinding()
+
+	if got := sweepExit(fleet, threshold{severity: finding.SevHigh}); got != exitFindings {
+		t.Errorf("finding at the threshold beside an unreadable repo = %d, want %d", got, exitFindings)
+	}
+	if got := sweepExit(fleet, threshold{severity: finding.SevCritical}); got != exitIncomplete {
+		t.Errorf("finding below the threshold beside an unreadable repo = %d, want %d", got, exitIncomplete)
+	}
+	if got := sweepExit(fleet, threshold{never: true}); got != exitClear {
+		t.Errorf("-fail never = %d, want %d", got, exitClear)
+	}
+}
