@@ -69,6 +69,12 @@ packages in one pass, and hands the results back per repository. Sibling project
 most of their dependency tree, so a fleet of 27 repos is far closer to one scan than to 27
 — and the feeds are fetched once, not once per repo.
 
+A program reading a sweep must read each repository's `complete`, `failed` and `gaps`, not
+only its findings: an OSV outage is reported as a gap on every repository it can have
+emptied. Under the default `-fail never` the exit code stays 0 whatever the gaps, so pass
+`-fail any` and treat exit 3 as "retry" when the exit code has to tell you. See
+[docs/usage.md](docs/usage.md#reading-a-sweep-from-a-program).
+
 `-format auto` prints the human report on a terminal and the one-per-line form everywhere
 else, so pipes and agent tool calls get the parseable version without asking. The path may
 be given before or after the flags.

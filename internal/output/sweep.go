@@ -16,13 +16,28 @@ type Sweep struct {
 	Warnings []string      `json:"warnings,omitempty"`
 }
 
-// AllGaps returns every gap in the run, the fleet's own and each repo's.
+// AllGaps returns every gap in the run, the fleet's own and each repo's, once
+// each: a fleet gap a repository inherits is still one gap.
 func (s Sweep) AllGaps() []finding.Gap {
-	out := append([]finding.Gap{}, s.Gaps...)
-	for _, r := range s.Repos {
-		out = append(out, r.Gaps...)
+	seen := map[finding.Gap]bool{}
+	out := []finding.Gap{}
+	for _, list := range append([][]finding.Gap{s.Gaps}, repoGapLists(s.Repos)...) {
+		for _, g := range list {
+			if !seen[g] {
+				seen[g] = true
+				out = append(out, g)
+			}
+		}
 	}
 	return out
+}
+
+func repoGapLists(repos []Report) [][]finding.Gap {
+	lists := make([][]finding.Gap, 0, len(repos))
+	for _, r := range repos {
+		lists = append(lists, r.Gaps)
+	}
+	return lists
 }
 
 // Complete reports whether the whole fleet was determined. One repository

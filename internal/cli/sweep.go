@@ -75,7 +75,7 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 		sweep.Warnings = append(sweep.Warnings, "no project found under "+root)
 		return sweep, exitClear
 	}
-	resolveFleet(ctx, repos, &sweep)
+	resolveFleet(ctx, osv.New(), repos, &sweep)
 	if !opts.noEnrich {
 		warnings, gaps := enrichFleet(ctx, opts, st, repos)
 		sweep.Warnings = append(sweep.Warnings, warnings...)
@@ -87,32 +87,25 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 
 // resolveFleet asks OSV about the fleet's unique packages once. A chunk that
 // failed costs its own packages and nothing else, so the fleet keeps every
-// answer that did arrive and reports the rest as gaps. The joined errors are
-// dropped because they say nothing the gaps beside them do not.
-func resolveFleet(ctx context.Context, repos []*repoScan, sweep *output.Sweep) {
+// answer that did arrive and reports the rest as gaps: on the fleet, and on
+// every repository whose answer the failure can have emptied, so a consumer
+// reading one repository never sees an outage as a clean result. The joined
+// errors are dropped because they say nothing the gaps beside them do not.
+func resolveFleet(ctx context.Context, client *osv.Client, repos []*repoScan, sweep *output.Sweep) {
 	unique := union(repos)
 	if len(unique) == 0 {
 		return
 	}
-	client := osv.New()
-	idx, gaps, _ := client.Query(ctx, unique)
-	sweep.Gaps = append(sweep.Gaps, gaps...)
-	ids := map[string][]string{}
-	var flat []string
-	for i, list := range idx {
-		if len(list) == 0 {
-			continue
-		}
-		ids[pkgKey(unique[i])] = list
-		flat = append(flat, list...)
-	}
-	vulns, fetchGaps, _ := client.Fetch(ctx, flat)
-	sweep.Gaps = append(sweep.Gaps, fetchGaps...)
+	idx, queryGaps, _ := client.Query(ctx, unique)
+	ids := indexIDs(unique, idx)
+	vulns, fetchGaps, _ := client.Fetch(ctx, flatIDs(ids))
+	sweep.Gaps = append(append(sweep.Gaps, queryGaps...), fetchGaps...)
 	absent := client.Absent()
 	for _, r := range repos {
 		findings, rangeGaps := buildFrom(r.pkgs, ids, vulns, absent)
 		r.report.Findings = findings
 		r.report.Gaps = append(r.report.Gaps, rangeGaps...)
+		r.report.Gaps = append(r.report.Gaps, repoGaps(r.pkgs, ids, queryGaps, fetchGaps)...)
 	}
 }
 
