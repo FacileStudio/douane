@@ -61,6 +61,7 @@ douane sweep [dir]  [flags]   inspect every repository under a directory
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
+  -timeout duration             stop the whole run after this long (default 10m)
   --version                     print the version and exit
 ```
 

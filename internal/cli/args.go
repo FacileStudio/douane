@@ -6,10 +6,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/output"
 )
+
+// defaultTimeout bounds a whole run. Every request already has its own
+// timeout and retry budget, but paging and alias fetching multiply them, and a
+// degraded upstream must not stall a nightly job for hours.
+const defaultTimeout = 10 * time.Minute
 
 // options is one invocation, already parsed and validated. done marks a run
 // that finished during parsing: -h prints the usage and leaves nothing to
@@ -26,6 +32,7 @@ type options struct {
 	informational string
 	noEnrich      bool
 	refresh       bool
+	timeout       time.Duration
 	done          bool
 }
 
@@ -34,7 +41,7 @@ type options struct {
 // natural CI line, and reading it only from the front made that one scan $PWD
 // while reporting success.
 func parseArgs(name string, args []string) (options, int) {
-	opts := options{path: ".", dbPath: defaultDB(), scope: "all", informational: "warn"}
+	opts := options{path: ".", dbPath: defaultDB(), scope: "all", informational: "warn", timeout: defaultTimeout}
 	paths, err := positional(newFlagSet(name, &opts), args)
 	if errors.Is(err, flag.ErrHelp) {
 		fmt.Print(usage)
@@ -53,20 +60,24 @@ func parseArgs(name string, args []string) (options, int) {
 	if len(paths) == 1 {
 		opts.path = paths[0]
 	}
-	if code := resolveBy(&opts); code != exitClear {
-		return opts, code
-	}
-	if code := resolveScope(&opts); code != exitClear {
-		return opts, code
-	}
-	if code := resolveFail(&opts); code != exitClear {
-		return opts, code
+	for _, resolve := range []func(*options) int{resolveTimeout, resolveBy, resolveScope, resolveFail} {
+		if code := resolve(&opts); code != exitClear {
+			return opts, code
+		}
 	}
 	return opts, resolveInformational(&opts)
 }
 
 // resolveBy turns -by into the layout output renders. fix groups findings by
 // the action that clears them; finding restores the flat list.
+func resolveTimeout(opts *options) int {
+	if opts.timeout > 0 {
+		return exitClear
+	}
+	fmt.Fprintf(os.Stderr, "douane: -timeout must be positive, got %s\n", opts.timeout)
+	return exitUsage
+}
+
 func resolveBy(opts *options) int {
 	switch output.Layout(opts.by) {
 	case output.LayoutFix, output.LayoutFinding:
@@ -126,6 +137,7 @@ func newFlagSet(name string, opts *options) *flag.FlagSet {
 	fs.StringVar(&opts.dbPath, "db", opts.dbPath, "")
 	fs.BoolVar(&opts.noEnrich, "no-enrich", false, "")
 	fs.BoolVar(&opts.refresh, "refresh", false, "")
+	fs.DurationVar(&opts.timeout, "timeout", defaultTimeout, "")
 	return fs
 }
 
