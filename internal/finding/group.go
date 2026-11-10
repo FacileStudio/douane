@@ -19,6 +19,7 @@ type Group struct {
 	Targets   []string `json:"targets"`
 	Installed []string `json:"installed"`
 	Rebuild   bool     `json:"rebuild,omitempty"`
+	Expired   int      `json:"expired_permits,omitempty"`
 
 	worst Finding
 }
@@ -50,9 +51,9 @@ func fixKey(f Finding, rebuild bool) string {
 // version), then folds targets that share a release line together, ordered
 // worst first by the same rank that orders findings. isNew reports whether a
 // finding is being seen for the first time; rebuilt whether rebuilding the
-// artifact already clears it. Either may be nil, which answers no for every
-// finding.
-func Groups(fs []Finding, isNew, rebuilt func(Finding) bool) []Group {
+// artifact already clears it; expired whether a lapsed permit returned it. Any
+// may be nil, which answers no for every finding.
+func Groups(fs []Finding, isNew, rebuilt, expired func(Finding) bool) []Group {
 	byKey := map[string]*Group{}
 	var keys []string
 	for _, f := range fs {
@@ -65,7 +66,7 @@ func Groups(fs []Finding, isNew, rebuilt func(Finding) bool) []Group {
 			byKey[k] = g
 			keys = append(keys, k)
 		}
-		g.absorb(f, isNew)
+		g.absorb(f, isNew, expired)
 	}
 	out := make([]Group, 0, len(keys))
 	for _, k := range keys {
@@ -103,12 +104,15 @@ func orderGroups(out []Group) {
 	})
 }
 
-// absorb folds one finding into its group, tracking count, novelty, the KEV
-// flag and the worst member under the ordering rank.
-func (g *Group) absorb(f Finding, isNew func(Finding) bool) {
+// absorb folds one finding into its group, tracking count, novelty, lapsed
+// permits, the KEV flag and the worst member under the ordering rank.
+func (g *Group) absorb(f Finding, isNew, expired func(Finding) bool) {
 	g.Count++
 	if isNew != nil && isNew(f) {
 		g.New++
+	}
+	if expired != nil && expired(f) {
+		g.Expired++
 	}
 	if f.Exploit.KEV {
 		g.KEV = true

@@ -18,8 +18,9 @@ const SchemaVersion = "1"
 // tool exists for never reached the format CI parses.
 type findingJSON struct {
 	finding.Finding
-	Key string `json:"key"`
-	New bool   `json:"new"`
+	Key           string `json:"key"`
+	New           bool   `json:"new"`
+	ExpiredPermit bool   `json:"expired_permit,omitempty"`
 }
 
 // reportJSON is one scan as json. Complete is the field that separates
@@ -33,6 +34,7 @@ type reportJSON struct {
 	Complete      bool            `json:"complete"`
 	Failed        bool            `json:"failed,omitempty"`
 	Findings      []findingJSON   `json:"findings"`
+	Permitted     []permittedJSON `json:"permitted"`
 	Groups        []finding.Group `json:"groups"`
 	Gaps          []finding.Gap   `json:"gaps"`
 	Warnings      []string        `json:"warnings,omitempty"`
@@ -53,9 +55,10 @@ type sweepJSON struct {
 func reportBody(r Report) reportJSON {
 	fs := make([]findingJSON, 0, len(r.Findings))
 	for _, f := range r.Findings {
-		fs = append(fs, findingJSON{Finding: f, Key: f.Key(), New: r.New[f.Key()]})
+		fs = append(fs, findingJSON{Finding: f, Key: f.Key(), New: r.New[f.Key()],
+			ExpiredPermit: r.Expired[f.Key()]})
 	}
-	groups := finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r))
+	groups := finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r), expiredFn(r))
 	if groups == nil {
 		groups = []finding.Group{}
 	}
@@ -64,7 +67,8 @@ func reportBody(r Report) reportJSON {
 		gaps = []finding.Gap{}
 	}
 	return reportJSON{Name: r.Name, Target: r.Target, Packages: r.Packages,
-		Complete: r.Complete(), Failed: r.Failed, Findings: fs, Groups: groups,
+		Complete: r.Complete(), Failed: r.Failed, Findings: fs,
+		Permitted: permittedBody(r.Permitted), Groups: groups,
 		Gaps: gaps, Warnings: r.Warnings}
 }
 

@@ -51,7 +51,7 @@ func writeGroup(w io.Writer, th theme, g finding.Group) {
 // with no source change. It is a label and never a suppression, since douane
 // cannot see when the image was last built.
 func groupBadge(th theme, g finding.Group, worst finding.Finding) string {
-	flags := badge(th, worst, g.New > 0)
+	flags := badge(th, worst, g.New > 0, g.Expired > 0)
 	if !g.Rebuild {
 		return flags
 	}

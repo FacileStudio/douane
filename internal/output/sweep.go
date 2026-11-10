@@ -50,6 +50,9 @@ func WriteSweep(w io.Writer, f Format, s Sweep) error { return WriteSweepTo(w, w
 // WriteSweepTo renders a fleet run, data on out and notes on errw. See WriteTo
 // for why the two streams are worth separating.
 func WriteSweepTo(out, errw io.Writer, f Format, l Layout, s Sweep) error {
+	if err := writeSweepPermitNotes(errw, s); err != nil {
+		return err
+	}
 	if f == JSON || f == Line {
 		if err := writeSweepNotes(errw, s); err != nil {
 			return err

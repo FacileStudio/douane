@@ -17,7 +17,7 @@ func TestGroupsCollapseToTheFix(t *testing.T) {
 	gs := finding.Groups([]finding.Finding{
 		grpFinding("GO-1", "5.0.0", false),
 		grpFinding("GO-2", "4.11.0", false),
-	}, nil, nil)
+	}, nil, nil, nil)
 	if len(gs) != 1 {
 		t.Fatalf("groups = %d, want one per fix, got %+v", len(gs), gs)
 	}
@@ -35,7 +35,7 @@ func TestGroupsCollapseToTheFix(t *testing.T) {
 func TestGroupsKeepNoFixApart(t *testing.T) {
 	noFix := grpFinding("GO-3", "5.0.0", false)
 	noFix.FixedIn = ""
-	gs := finding.Groups([]finding.Finding{grpFinding("GO-1", "5.0.0", false), noFix}, nil, nil)
+	gs := finding.Groups([]finding.Finding{grpFinding("GO-1", "5.0.0", false), noFix}, nil, nil, nil)
 	if len(gs) != 2 {
 		t.Fatalf("groups = %d, want the no-fix package kept apart:\n%+v", len(gs), gs)
 	}
@@ -57,7 +57,7 @@ func TestGroupsCarryWorstAndKEV(t *testing.T) {
 	mid := grpFinding("GO-4", "5.0.0", false)
 	mid.Severity = finding.SevMedium
 	kev := grpFinding("GO-5", "4.11.0", true)
-	gs := finding.Groups([]finding.Finding{mid, kev}, nil, nil)
+	gs := finding.Groups([]finding.Finding{mid, kev}, nil, nil, nil)
 	if len(gs) != 1 || !gs[0].KEV {
 		t.Fatalf("groups = %+v, want one KEV-marked group", gs)
 	}
@@ -72,7 +72,7 @@ func TestGroupsCountNewThroughThePredicate(t *testing.T) {
 	f2 := grpFinding("GO-2", "4.11.0", false)
 	gs := finding.Groups([]finding.Finding{f1, f2}, func(f finding.Finding) bool {
 		return f.ID == "GO-2"
-	}, nil)
+	}, nil, nil)
 	if gs[0].New != 1 {
 		t.Fatalf("new = %d, want only the unseen finding counted", gs[0].New)
 	}
@@ -84,7 +84,7 @@ func TestGroupsOrderVersionsNumerically(t *testing.T) {
 	gs := finding.Groups([]finding.Finding{
 		grpFinding("GO-1", "4.11.0", false),
 		grpFinding("GO-2", "4.9.0", false),
-	}, nil, nil)
+	}, nil, nil, nil)
 	want := "4.9.0, 4.11.0"
 	if got := strings.Join(gs[0].Installed, ", "); got != want {
 		t.Fatalf("installed = %q, want %q — versions must sort numerically", got, want)
@@ -104,7 +104,7 @@ func TestGroupsMergeOneReleaseLine(t *testing.T) {
 	for _, v := range []string{"1.25.8", "1.25.9", "1.25.10", "1.25.11", "1.25.12", "1.25.13"} {
 		fs = append(fs, stdlibFinding("GO-"+v, v))
 	}
-	gs := finding.Groups(fs, nil, nil)
+	gs := finding.Groups(fs, nil, nil, nil)
 	if len(gs) != 1 {
 		t.Fatalf("groups = %d, want one bump for one release line:\n%+v", len(gs), gs)
 	}
@@ -124,7 +124,7 @@ func TestGroupsKeepReleaseLinesApart(t *testing.T) {
 		stdlibFinding("GO-b", "1.24.13"),
 		stdlibFinding("GO-c", "1.25.6"),
 		stdlibFinding("GO-d", "1.25.13"),
-	}, nil, nil)
+	}, nil, nil, nil)
 	if len(gs) != 2 {
 		t.Fatalf("groups = %d, want one per release line:\n%+v", len(gs), gs)
 	}
@@ -144,7 +144,7 @@ func TestGroupsNeverMergeIntoNoFix(t *testing.T) {
 		stdlibFinding("GO-a", "1.25.8"),
 		stdlibFinding("GO-b", "1.25.13"),
 		stdlibFinding("GO-c", ""),
-	}, nil, nil)
+	}, nil, nil, nil)
 	if len(gs) != 2 {
 		t.Fatalf("groups = %d, want the no-fix finding kept apart:\n%+v", len(gs), gs)
 	}
@@ -165,7 +165,7 @@ func TestGroupsMergePreserveEveryFinding(t *testing.T) {
 	kev.Exploit = finding.Exploit{KEV: true}
 	gs := finding.Groups([]finding.Finding{low, kev}, func(f finding.Finding) bool {
 		return f.ID == "GO-b"
-	}, nil)
+	}, nil, nil)
 	g := gs[0]
 	if g.Count != 2 || g.New != 1 || !g.KEV {
 		t.Fatalf("group = %+v, want count 2, one new, KEV carried", g)

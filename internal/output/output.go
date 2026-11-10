@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/permit"
 )
 
 // Format selects how findings are rendered.
@@ -64,6 +65,13 @@ type Report struct {
 	// finding because it is a property of a module: one repo carried it on 121
 	// findings for three modules.
 	BuildLines map[string]string `json:"build_lines,omitempty"`
+
+	// Permitted are the findings a valid permit took out of Findings, and
+	// Expired the keys of findings a lapsed permit gave back to it. PermitNotes
+	// are what the run says about its permits, always on the notes stream.
+	Permitted   []permit.Match  `json:"-"`
+	Expired     map[string]bool `json:"-"`
+	PermitNotes []string        `json:"-"`
 }
 
 // Complete reports whether douane determined everything it set out to. An
@@ -79,9 +87,13 @@ func Write(w io.Writer, f Format, r Report) error { return WriteTo(w, w, f, Layo
 // warnings — to errw. In line and json form that separation is the whole
 // point: what stdout carries is then findings and nothing else, and a warning
 // can no longer be mistaken for one by whatever is grepping the stream. Text
-// is a single narrative for a human, so it stays on one writer. The layout
-// picks grouped or flat; json ignores it and always emits both shapes.
+// is a single narrative for a human, so it stays on one writer, except for
+// permit notes, which go to errw in every format. The layout picks grouped or
+// flat; json ignores it and always emits both shapes.
 func WriteTo(out, errw io.Writer, f Format, l Layout, r Report) error {
+	if err := writePermitNotes(errw, "", r.PermitNotes); err != nil {
+		return err
+	}
 	if f == JSON || f == Line {
 		if err := writeNotes(errw, "", r.Gaps, r.Warnings); err != nil {
 			return err
@@ -105,7 +117,7 @@ func writeLines(w io.Writer, prefix string, r Report, l Layout) error {
 	if l == LayoutFinding {
 		return writeFlatLines(w, prefix, r)
 	}
-	for _, g := range finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r)) {
+	for _, g := range finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r), expiredFn(r)) {
 		fix := g.FixedIn
 		if fix == "" {
 			fix = "no-fix"
@@ -116,9 +128,9 @@ func writeLines(w io.Writer, prefix string, r Report, l Layout) error {
 			head += fmt.Sprintf(" in %d targets", n)
 		}
 		worst := g.WorstFinding()
-		if _, err := fmt.Fprintf(w, "%s: %s: worst=%s [epss=%.4f kev=%t fix=%s]\n",
+		if _, err := fmt.Fprintf(w, "%s: %s: worst=%s [epss=%.4f kev=%t fix=%s%s]\n",
 			head, strings.ToLower(g.Worst.String()), worst.ID,
-			worst.Exploit.EPSS, g.KEV, fix); err != nil {
+			worst.Exploit.EPSS, g.KEV, fix, permitTag(g.Expired > 0)); err != nil {
 			return err
 		}
 	}
@@ -131,9 +143,9 @@ func writeFlatLines(w io.Writer, prefix string, r Report) error {
 		if fix == "" {
 			fix = "no-fix"
 		}
-		if _, err := fmt.Fprintf(w, "%s%s:%s@%s: %s: %s [%s epss=%.4f kev=%t fix=%s]\n",
+		if _, err := fmt.Fprintf(w, "%s%s:%s@%s: %s: %s [%s epss=%.4f kev=%t fix=%s%s]\n",
 			prefix, f.Ecosystem, f.Package, f.Installed, strings.ToLower(f.Severity.String()),
-			f.ID, f.Target, f.Exploit.EPSS, f.Exploit.KEV, fix); err != nil {
+			f.ID, f.Target, f.Exploit.EPSS, f.Exploit.KEV, fix, permitTag(r.Expired[f.Key()])); err != nil {
 			return err
 		}
 	}

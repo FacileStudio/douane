@@ -23,10 +23,10 @@ func sweepFixLines(w io.Writer, s Sweep) error {
 		}
 		worst := g.WorstFinding()
 		if _, err := fmt.Fprintf(w,
-			"%s:%s@%s: %d finding%s in %d target%s: %s: worst=%s [epss=%.4f kev=%t fix=%s targets=%s]\n",
+			"%s:%s@%s: %d finding%s in %d target%s: %s: worst=%s [epss=%.4f kev=%t fix=%s targets=%s%s]\n",
 			g.Ecosystem, g.Package, fix, g.Count, plural(g.Count), len(g.Targets),
 			plural(len(g.Targets)), strings.ToLower(g.Worst.String()), worst.ID,
-			worst.Exploit.EPSS, g.KEV, fix, capAt(g.Targets, 5)); err != nil {
+			worst.Exploit.EPSS, g.KEV, fix, capAt(g.Targets, 5), permitTag(g.Expired > 0)); err != nil {
 			return err
 		}
 	}
@@ -79,7 +79,7 @@ func writeSweepRepoText(w io.Writer, th theme, s Sweep) {
 // attributing each to its repository name rather than the lockfile path a
 // single scan would show.
 func fleetGroups(s Sweep) []finding.Group {
-	newSet, rebuilt := map[string]bool{}, map[string]bool{}
+	newSet, rebuilt, expired := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	var fs []finding.Finding
 	for _, r := range s.Repos {
 		for k := range r.New {
@@ -89,12 +89,14 @@ func fleetGroups(s Sweep) []finding.Group {
 			if isRebuild(r, f) {
 				rebuilt[f.Key()] = true
 			}
+			expired[r.Name+"|"+f.Key()] = r.Expired[f.Key()]
 			f.Target = r.Name
 			fs = append(fs, f)
 		}
 	}
 	return finding.Groups(fs, func(f finding.Finding) bool { return newSet[f.Key()] },
-		func(f finding.Finding) bool { return rebuilt[f.Key()] })
+		func(f finding.Finding) bool { return rebuilt[f.Key()] },
+		func(f finding.Finding) bool { return expired[f.Target+"|"+f.Key()] })
 }
 
 // writeRepoNotes keeps the grouped view honest: a fix can collapse the
@@ -114,6 +116,6 @@ func writeRepo(w io.Writer, th theme, r Report) {
 		th.bold(r.Name), len(r.Findings), r.Packages)
 	writeNotesText(w, th, r.Gaps, r.Warnings)
 	for _, f := range r.Findings {
-		writeFinding(w, th, f, r.New[f.Key()])
+		writeFinding(w, th, f, r.New[f.Key()], r.Expired[f.Key()])
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/inventory"
 	"github.com/FacileStudio/douane/internal/output"
+	"github.com/FacileStudio/douane/internal/permit"
 	"github.com/FacileStudio/douane/internal/store"
 	"github.com/FacileStudio/douane/internal/version"
 )
@@ -40,10 +41,16 @@ Flags:
   -timeout duration             stop the whole run after this long (default 10m)
   --version                     print the version and exit
 
+Permits:
+  douane.yml at a project's root suppresses a finding until a date. Every
+  entry needs id, reason and expires (YYYY-MM-DD, at most 365 days ahead);
+  package is optional. A lapsed permit returns its finding marked
+  EXPIRED PERMIT and exits 1 whatever -fail says.
+
 Exit codes:
   0  clear
-  1  findings at or above -fail
-  2  bad usage or unreadable input
+  1  findings at or above -fail, or a finding whose permit has lapsed
+  2  bad usage or unreadable input, an invalid douane.yml included
   3  scan incomplete — douane could not determine part of the answer
 `
 
@@ -75,6 +82,11 @@ func runScan(args []string) int {
 	if code != exitClear || opts.done {
 		return code
 	}
+	today := permit.Today()
+	permits, ok := loadPermits(opts.path, today)
+	if !ok {
+		return exitUsage
+	}
 	st, warnings := openStore(opts.dbPath)
 	if st != nil {
 		defer st.Close()
@@ -86,13 +98,13 @@ func runScan(args []string) int {
 		return code
 	}
 	report.Warnings = append(warnings, report.Warnings...)
-
+	applyPermits(&report, permits, today)
 	form := output.Resolve(output.Format(opts.format), os.Stdout)
 	if err := output.WriteTo(os.Stdout, os.Stderr, form, output.Layout(opts.by), report); err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return exitUsage
 	}
-	return exitFor(report.Findings, report.Gaps, opts.fail)
+	return permitExit(exitFor(report.Findings, report.Gaps, opts.fail), report)
 }
 
 // openStore opens the sweep database, which carries both the history and the

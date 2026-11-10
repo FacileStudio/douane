@@ -16,12 +16,12 @@ func writeText(w io.Writer, r Report, l Layout) error {
 	}
 	if l == LayoutFinding {
 		for _, f := range r.Findings {
-			writeFinding(w, th, f, r.New[f.Key()])
+			writeFinding(w, th, f, r.New[f.Key()], r.Expired[f.Key()])
 		}
 		writeSummary(w, th, r, 0)
 		return nil
 	}
-	groups := finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r))
+	groups := finding.Groups(r.Findings, isNewFn(r), rebuiltFn(r), expiredFn(r))
 	for _, g := range groups {
 		writeGroup(w, th, g)
 	}
@@ -43,12 +43,12 @@ func writeNothingHeld(w io.Writer, th theme, r Report) error {
 	return err
 }
 
-func writeFinding(w io.Writer, th theme, f finding.Finding, isNew bool) {
+func writeFinding(w io.Writer, th theme, f finding.Finding, isNew, expired bool) {
 	sep := " " + th.dim(th.Sep) + " "
 	fmt.Fprintf(w, "%s %s  %s%s %s%s\n",
 		th.mark(f.Severity, th.Mark), th.mark(f.Severity, pad(f.Severity.String(), 8)),
 		th.dim(f.Ecosystem+":"), th.bold(f.Package), th.dim(f.Installed),
-		badge(th, f, isNew))
+		badge(th, f, isNew, expired))
 	fmt.Fprintf(w, "      %s%s%s%s%s\n",
 		th.dim(f.ID), sep, epssLabel(th, f), sep, fixLabel(th, f))
 	fmt.Fprintf(w, "      %s\n", th.dim(f.Target))
@@ -58,8 +58,13 @@ func writeFinding(w io.Writer, th theme, f finding.Finding, isNew bool) {
 	fmt.Fprintln(w)
 }
 
-func badge(th theme, f finding.Finding, isNew bool) string {
+// badge lists a finding's flags. EXPIRED PERMIT comes first: it is the one a
+// reader must act on today, because the run already failed over it.
+func badge(th theme, f finding.Finding, isNew, expired bool) string {
 	flags := []string{}
+	if expired {
+		flags = append(flags, th.alarm("EXPIRED PERMIT"))
+	}
 	if f.Exploit.KEV {
 		flags = append(flags, th.alarm("KEV"))
 	}

@@ -9,14 +9,16 @@ import (
 	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/osv"
 	"github.com/FacileStudio/douane/internal/output"
+	"github.com/FacileStudio/douane/internal/permit"
 	"github.com/FacileStudio/douane/internal/store"
 )
 
-// repoScan is one repository mid-sweep: its packages, and the report being
-// assembled for it.
+// repoScan is one repository mid-sweep: its packages, its own permits, and
+// the report being assembled for it.
 type repoScan struct {
-	report output.Report
-	pkgs   []finding.Package
+	report  output.Report
+	pkgs    []finding.Package
+	permits []permit.Permit
 }
 
 func runSweep(args []string) int {
@@ -41,7 +43,7 @@ func runSweep(args []string) int {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return exitUsage
 	}
-	return sweepExit(result, opts.fail)
+	return permitExit(sweepExit(result, opts.fail), result.Repos...)
 }
 
 // sweepExit applies exitFor to the whole fleet. Findings at or above -fail exit
@@ -73,6 +75,9 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 		return output.Sweep{}, exitUsage
 	}
 	repos := inventories(dirs)
+	if !attachPermits(repos, permit.Today()) {
+		return output.Sweep{}, exitUsage
+	}
 	sweep := output.Sweep{Root: root}
 	if len(repos) == 0 {
 		sweep.Warnings = append(sweep.Warnings, "no project found under "+root)
@@ -163,14 +168,15 @@ func enrichFleet(ctx context.Context, opts options, st *store.Store, repos []*re
 }
 
 // collect ranks each repository, filters it to the requested scope, records
-// its history and orders the fleet so the first group printed is the one to
-// open first.
+// its history, applies its permits and orders the fleet so the first group
+// printed is the one to open first.
 func collect(repos []*repoScan, st *store.Store, sweep *output.Sweep, scope finding.ScopeFilter, info string) {
 	for _, r := range repos {
 		finding.Rank(r.report.Findings)
 		r.report.Findings = finding.FilterScope(r.report.Findings, scope)
 		r.report.Findings = finding.FilterInformational(r.report.Findings, info == "ignore")
 		record(st, &r.report)
+		applyPermits(&r.report, r.permits, permit.Today())
 		sweep.Repos = append(sweep.Repos, r.report)
 	}
 	output.SortRepos(sweep.Repos)
