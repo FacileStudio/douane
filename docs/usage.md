@@ -66,6 +66,19 @@ The packages of sibling projects overlap almost completely, so `sweep` collects 
 inventory first, resolves the **union** once, and splits the findings back out per
 repository. Each repository still reports its own lockfile paths and its own history diff.
 
+### Reading a sweep from a program
+
+Read each repository's own `complete`, `failed` and `gaps`, never only its `findings`. The
+union is resolved once, so a failed OSV query or a missing advisory record is a gap at the
+root and also a gap on every repository it can have emptied: a failed query on every
+repository with packages, a missing advisory on the repositories whose packages asked for
+it. An outage therefore reads `"complete": false` on each affected repository, not as a
+repository with no findings.
+
+The exit code does not carry this under the default `-fail never`, which answers 0 whatever
+the gaps (see below). A program that needs the exit code to say "incomplete" passes
+`-fail any` and treats 3 as "retry", or reads the root `complete`.
+
 ## Feed cache
 
 KEV and EPSS are cached in the sweep database for 24 hours — the catalogue whole, EPSS one
@@ -114,7 +127,8 @@ Findings outrank incompleteness. A run holding both exits 1: both block, and "yo
 vulnerable" is the finished answer, so there is nothing left to retry.
 
 `-fail never` never returns 3. Gaps still print and still appear in the JSON, but "just
-tell me what you found" is a valid request and douane answers it with 0.
+tell me what you found" is a valid request and douane answers it with 0. A program that runs
+under `-fail never` must read `complete` and `gaps` itself, at the root or per repository.
 
 `-fail kev` ignores severity entirely and fails only when something in the tree is on
 CISA's known-exploited list. On this fleet it has never fired, so treat it as a tripwire

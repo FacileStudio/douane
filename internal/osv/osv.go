@@ -40,6 +40,20 @@ func New() *Client {
 	}
 }
 
+// NewAt returns a Client pointed at another OSV-compatible pair of endpoints,
+// such as a mirror or a test server.
+func NewAt(batch, vuln string) *Client {
+	c := New()
+	c.base, c.vuln = batch, vuln
+	return c
+}
+
+// WithAttempts bounds how many times one request is tried in total.
+func (c *Client) WithAttempts(n int) *Client {
+	c.http = c.http.WithAttempts(n)
+	return c
+}
+
 // Query returns, for each package, the ids of the vulnerabilities affecting it.
 // The batch endpoint returns ids only, so details must be fetched separately.
 //
