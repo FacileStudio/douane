@@ -20,6 +20,7 @@ const untaggedImageDetail = "a golang build stage carries no Go release in its i
 // and the gaps for the stages that could not be resolved to either.
 type buildLines struct {
 	gapSet
+	opts  Options
 	root  string
 	lines map[string]string
 }
@@ -38,9 +39,11 @@ type buildLines struct {
 // Only the modules a golang stage copies a go.mod for are mapped, never every
 // module in the repo. A library distributed as source, such as a repo's own
 // SDK, is compiled by its consumers, so its go directive genuinely is the
-// release it is built with and no image tag may overrule it.
-func BuildLines(root string) (map[string]string, []finding.Gap) {
+// release it is built with and no image tag may overrule it. The walk skips
+// the same directories Scan does under o.
+func BuildLines(root string, o Options) (map[string]string, []finding.Gap) {
 	b := &buildLines{
+		opts:   o,
 		gapSet: gapSet{noted: map[string]bool{}},
 		lines:  map[string]string{},
 	}
@@ -68,7 +71,7 @@ func (b *buildLines) visit(path string, d fs.DirEntry, err error) error {
 		return nil
 	}
 	if d.IsDir() {
-		if path != b.root && skipDirs[d.Name()] {
+		if path != b.root && b.opts.Skips(d.Name()) {
 			return filepath.SkipDir
 		}
 		return nil

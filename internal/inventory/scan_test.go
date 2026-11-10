@@ -25,7 +25,7 @@ func invTree(t *testing.T, files map[string]string) string {
 
 func invScan(t *testing.T, files map[string]string) ([]finding.Package, []finding.Gap) {
 	t.Helper()
-	pkgs, gaps, err := Scan(invTree(t, files))
+	pkgs, gaps, err := Scan(invTree(t, files), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,13 +57,13 @@ func invGap(t *testing.T, gaps []finding.Gap, kind finding.GapKind, subject stri
 // package already collected, so one stale fixture cost a repo its whole scan.
 func TestScanSurvivesAnUnreadableLockfile(t *testing.T) {
 	pkgs, gaps := invScan(t, map[string]string{
-		"go.mod":                     "module x\n\ngo 1.25.0\n\nrequire github.com/a/b v1.2.3\n",
-		"testdata/package-lock.json": "{not json",
+		"go.mod":                "module x\n\ngo 1.25.0\n\nrequire github.com/a/b v1.2.3\n",
+		"web/package-lock.json": "{not json",
 	})
 	if !invHas(pkgs, "github.com/a/b", "1.2.3") {
 		t.Fatalf("the good lockfile lost its packages: %+v", pkgs)
 	}
-	invGap(t, gaps, finding.GapUnreadable, filepath.Join("testdata", "package-lock.json"))
+	invGap(t, gaps, finding.GapUnreadable, filepath.Join("web", "package-lock.json"))
 }
 
 // TestScanReportsReleaseModules proves the whole point of the go directive
@@ -159,7 +159,7 @@ func TestScanDropsEmptyPackageName(t *testing.T) {
 // TestScanUnreadableRootIsFatal: a target douane cannot open at all is bad
 // input, not a scan with a hole in it.
 func TestScanUnreadableRootIsFatal(t *testing.T) {
-	if _, _, err := Scan(filepath.Join(t.TempDir(), "nope")); err == nil {
+	if _, _, err := Scan(filepath.Join(t.TempDir(), "nope"), Options{}); err == nil {
 		t.Fatal("Scan of a missing target returned no error")
 	}
 }

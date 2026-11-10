@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/inventory"
 	"github.com/FacileStudio/douane/internal/output"
 )
 
@@ -28,10 +28,10 @@ type options struct {
 	fail          threshold
 	dbPath        string
 	scope         string
-	scopeFilter   finding.ScopeFilter
 	informational string
 	noEnrich      bool
 	refresh       bool
+	walk          inventory.Options
 	timeout       time.Duration
 	done          bool
 }
@@ -87,24 +87,6 @@ func resolveBy(opts *options) int {
 	return exitUsage
 }
 
-// resolveScope validates -scope and stores which findings survive it on the
-// options. prod, dev and all are the only values sweep understands; anything
-// else is a usage error and stops the invocation.
-func resolveScope(opts *options) int {
-	switch opts.scope {
-	case "prod":
-		opts.scopeFilter = finding.FilterProd
-	case "dev":
-		opts.scopeFilter = finding.FilterDev
-	case "all":
-		opts.scopeFilter = finding.FilterAll
-	default:
-		fmt.Fprintf(os.Stderr, "douane: unknown -scope value %q\n", opts.scope)
-		return exitUsage
-	}
-	return exitClear
-}
-
 // resolveInformational validates -informational and folds it onto the fail
 // threshold. warn keeps informational findings out of the exit code entirely;
 // fail makes them trip whatever the non-never non-kev threshold is; ignore
@@ -137,6 +119,7 @@ func newFlagSet(name string, opts *options) *flag.FlagSet {
 	fs.StringVar(&opts.dbPath, "db", opts.dbPath, "")
 	fs.BoolVar(&opts.noEnrich, "no-enrich", false, "")
 	fs.BoolVar(&opts.refresh, "refresh", false, "")
+	fs.BoolVar(&opts.walk.Testdata, "include-testdata", false, "")
 	fs.DurationVar(&opts.timeout, "timeout", defaultTimeout, "")
 	return fs
 }

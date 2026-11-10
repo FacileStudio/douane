@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/inventory"
 	"github.com/FacileStudio/douane/internal/osv"
 	"github.com/FacileStudio/douane/internal/output"
 )
@@ -17,8 +18,9 @@ func TestDiscoverFindsCheckoutsAndSkipsTheRest(t *testing.T) {
 	write(t, filepath.Join(root, "lockfile-only", "package-lock.json"), "{}")
 	write(t, filepath.Join(root, "prose", "README.md"), "# hello")
 	write(t, filepath.Join(root, ".hidden", ".git", "HEAD"), "ref: refs/heads/main")
+	write(t, filepath.Join(root, "testdata", "go.mod"), "module fixture\n")
 
-	dirs, err := discover(root)
+	dirs, err := discover(root, inventory.Options{})
 	if err != nil {
 		t.Fatalf("discover: %v", err)
 	}
@@ -28,6 +30,9 @@ func TestDiscoverFindsCheckoutsAndSkipsTheRest(t *testing.T) {
 	}
 	if len(names) != 2 || names[0] != "checkout" || names[1] != "lockfile-only" {
 		t.Fatalf("discover = %v, want [checkout lockfile-only]", names)
+	}
+	if dirs, _ := discover(root, inventory.Options{Testdata: true}); len(dirs) != 3 {
+		t.Fatalf("discover -include-testdata = %v, want testdata swept too", dirs)
 	}
 }
 
@@ -64,7 +69,7 @@ func TestInventoriesKeepsProjectsWithoutPackages(t *testing.T) {
 	write(t, filepath.Join(root, "empty", ".git", "HEAD"), "ref: refs/heads/main")
 	write(t, filepath.Join(root, "real", "go.mod"), "module example.com/x\n\nrequire golang.org/x/crypto v0.31.0\n")
 
-	repos := inventories([]string{filepath.Join(root, "empty"), filepath.Join(root, "real")})
+	repos := inventories([]string{filepath.Join(root, "empty"), filepath.Join(root, "real")}, inventory.Options{})
 	if len(repos) != 2 {
 		t.Fatalf("inventories kept %d repos, want 2 — a repo douane cannot read must still be reported", len(repos))
 	}
@@ -152,5 +157,15 @@ func TestSweepExitRanksAFindingOverAnUnreadableRepo(t *testing.T) {
 	}
 	if got := sweepExit(fleet, threshold{never: true}); got != exitClear {
 		t.Errorf("-fail never = %d, want %d", got, exitClear)
+	}
+}
+
+func TestIncludeTestdataReachesTheWalk(t *testing.T) {
+	opts, code := parseArgs("scan", []string{"-include-testdata", "."})
+	if code != exitClear || !opts.walk.Testdata {
+		t.Fatalf("code = %d, walk = %+v; want -include-testdata to reach the walk", code, opts.walk)
+	}
+	if opts, _ := parseArgs("scan", nil); opts.walk.Testdata {
+		t.Fatal("testdata is read by default")
 	}
 }

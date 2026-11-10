@@ -69,12 +69,12 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return output.Sweep{}, exitUsage
 	}
-	dirs, err := discover(root)
+	dirs, err := discover(root, opts.walk)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return output.Sweep{}, exitUsage
 	}
-	repos := inventories(dirs)
+	repos := inventories(dirs, opts.walk)
 	attachPermits(repos, permit.Today())
 	sweep := output.Sweep{Root: root}
 	if len(repos) == 0 {
@@ -87,7 +87,7 @@ func sweepAll(ctx context.Context, opts options, st *store.Store) (output.Sweep,
 		sweep.Warnings = append(sweep.Warnings, warnings...)
 		sweep.Gaps = append(sweep.Gaps, gaps...)
 	}
-	collect(repos, st, &sweep, opts.scopeFilter, opts.informational)
+	collect(repos, st, &sweep, opts.scopeFilter(), opts.informational)
 	return sweep, exitClear
 }
 

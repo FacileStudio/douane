@@ -14,8 +14,9 @@ import (
 // and it takes each direct child that is one; point it at a checkout itself
 // and it sweeps that, rather than reporting an empty fleet. It does not
 // recurse: walking deeper would rediscover every nested app as a repository of
-// its own.
-func discover(root string) ([]string, error) {
+// its own. A testdata child is a fixture, not a repository, unless o asks
+// for fixtures.
+func discover(root string, o inventory.Options) ([]string, error) {
 	if isProject(root) {
 		return []string{filepath.Clean(root)}, nil
 	}
@@ -25,19 +26,20 @@ func discover(root string) ([]string, error) {
 	}
 	var out []string
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".") {
-			continue
-		}
 		dir := filepath.Join(root, e.Name())
-		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
-			continue
-		}
-		if isProject(dir) {
+		if isChildProject(dir, e.Name(), o) {
 			out = append(out, dir)
 		}
 	}
 	return out, nil
+}
+
+func isChildProject(dir, name string, o inventory.Options) bool {
+	if strings.HasPrefix(name, ".") || o.SkipsFixtures(name) {
+		return false
+	}
+	info, err := os.Stat(dir)
+	return err == nil && info.IsDir() && isProject(dir)
 }
 
 // isProject reports whether dir is worth scanning: a checkout, or anything
@@ -61,7 +63,7 @@ func isProject(dir string) bool {
 // One unreadable lockfile must not cost the fleet its sweep either, so the
 // error becomes that repository's gap, which is rendered in every format, and
 // the sweep carries on.
-func inventories(dirs []string) []*repoScan {
+func inventories(dirs []string, o inventory.Options) []*repoScan {
 	var out []*repoScan
 	for _, dir := range dirs {
 		r := &repoScan{report: output.Report{
@@ -69,8 +71,8 @@ func inventories(dirs []string) []*repoScan {
 			Target: dir,
 			New:    map[string]bool{},
 		}}
-		pkgs, gaps, err := inventory.Scan(dir)
-		build, buildGaps := inventory.BuildLines(dir)
+		pkgs, gaps, err := inventory.Scan(dir, o)
+		build, buildGaps := inventory.BuildLines(dir, o)
 		r.report.BuildLines = build
 		r.report.Gaps = append(gaps, buildGaps...)
 		if err != nil {

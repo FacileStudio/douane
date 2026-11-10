@@ -56,7 +56,7 @@ ENTRYPOINT ["/api"]
 
 func invBuildLines(t *testing.T, files map[string]string) (map[string]string, []finding.Gap) {
 	t.Helper()
-	return BuildLines(invTree(t, files))
+	return BuildLines(invTree(t, files), Options{})
 }
 
 func invWantLines(t *testing.T, got, want map[string]string) {

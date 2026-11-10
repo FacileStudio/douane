@@ -15,6 +15,7 @@ const binaryBunLockDetail = "binary bun lockfile is unreadable, run `bun install
 
 type collector struct {
 	gapSet
+	opts   Options
 	root   string
 	seen   map[string]bool
 	parsed map[string]bool
@@ -33,7 +34,7 @@ func (c *collector) visit(path string, d fs.DirEntry, err error) error {
 		return nil
 	}
 	if d.IsDir() {
-		if path != c.root && skipDirs[d.Name()] {
+		if path != c.root && c.opts.Skips(d.Name()) {
 			return filepath.SkipDir
 		}
 		return nil

@@ -12,6 +12,24 @@ var skipDirs = map[string]bool{
 	"dist": true, "build": true, ".svelte-kit": true, ".venv": true,
 }
 
+// Options says how far a walk reads. Testdata reads directories named
+// testdata, which are skipped by default: Go itself leaves them out of every
+// build, so a fixture there, such as a deliberately broken Dockerfile, is not
+// something the project ships.
+type Options struct {
+	Testdata bool
+}
+
+// Skips reports whether a walk under o reads past a directory called name.
+func (o Options) Skips(name string) bool {
+	return skipDirs[name] || o.SkipsFixtures(name)
+}
+
+// SkipsFixtures reports whether name is a fixture directory o leaves unread.
+func (o Options) SkipsFixtures(name string) bool {
+	return name == "testdata" && !o.Testdata
+}
+
 type parser struct {
 	file  string
 	parse func(path string, data []byte) ([]finding.Package, []finding.Gap, error)
@@ -42,17 +60,19 @@ func Lockfiles() []string {
 // Scan walks root and returns every dependency declared by a lockfile it
 // recognises, plus a gap for each one it could not read. Directories holding
 // installed artefacts rather than sources are skipped, so a vendored copy is
-// never mistaken for a declared dependency.
+// never mistaken for a declared dependency, and so are test fixtures unless o
+// asks for them.
 //
 // A file that fails to parse costs its own packages and nothing else. Failing
 // the walk instead discarded every package already collected, so one stale
-// fixture under testdata/ used to cost a repo its entire scan.
-func Scan(root string) ([]finding.Package, []finding.Gap, error) {
+// fixture used to cost a repo its entire scan.
+func Scan(root string, o Options) ([]finding.Package, []finding.Gap, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, nil, err
 	}
 	c := &collector{
+		opts:   o,
 		root:   abs,
 		gapSet: gapSet{noted: map[string]bool{}},
 		seen:   map[string]bool{},

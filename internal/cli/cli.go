@@ -40,6 +40,8 @@ Flags:
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
+  -include-testdata             also read directories named testdata, which are
+                                skipped like vendor and node_modules by default
   -timeout duration             stop the whole run after this long (default 10m)
   --version                     print the version and exit
 
@@ -129,12 +131,12 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return output.Report{}, exitUsage
 	}
-	pkgs, gaps, err := inventory.Scan(target)
+	pkgs, gaps, err := inventory.Scan(target, opts.walk)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "douane: %v\n", err)
 		return output.Report{}, exitUsage
 	}
-	build, buildGaps := inventory.BuildLines(target)
+	build, buildGaps := inventory.BuildLines(target, opts.walk)
 	report := output.Report{Target: target, Packages: len(pkgs), New: map[string]bool{},
 		Gaps: append(gaps, buildGaps...), BuildLines: build}
 	if len(pkgs) == 0 {
@@ -149,7 +151,7 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 		report.Gaps = append(report.Gaps, res.Gaps...)
 	}
 	finding.Rank(report.Findings)
-	report.Findings = finding.FilterScope(report.Findings, opts.scopeFilter)
+	report.Findings = finding.FilterScope(report.Findings, opts.scopeFilter())
 	report.Findings = finding.FilterInformational(report.Findings, opts.informational == "ignore")
 	record(st, &report)
 	return report, exitClear
