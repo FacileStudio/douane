@@ -62,6 +62,7 @@ douane sweep [dir]  [flags]   inspect every repository under a directory
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
+  -include-testdata             also read directories named testdata (skipped by default)
   -timeout duration             stop the whole run after this long (default 10m)
   --version                     print the version and exit
 ```
@@ -110,7 +111,10 @@ for good. `douane scan` refuses a file with a missing field, an unknown key or a
 exit 2 and the line at fault.
 
 A valid permit takes its finding out of the output and the `-fail` calculation; JSON lists it
-under `permitted` with its reason. On the day after `expires`, the finding comes back marked
+under `permitted` with its reason. A gap that exists only because of that finding, such as
+an advisory with no severity anywhere, goes with it: JSON lists it under the permitted
+finding and it no longer makes the run exit 3. A gap about the scan itself, such as an
+unreadable lockfile or a feed outage, is never covered by a permit. On the day after `expires`, the finding comes back marked
 **EXPIRED PERMIT** and the run exits 1 whatever `-fail` says. Permits expiring within 14 days
 are listed on stderr on every run. In a sweep, each repository's `douane.yml` applies to that
 repository only, and an invalid one costs that repository alone: it is skipped and reported

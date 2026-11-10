@@ -16,6 +16,7 @@ Defaults to the current directory.
 | `-db` | path, or `""` | `~/.douane.db` | Sweep history; `""` disables it |
 | `-no-enrich` | — | off | Skip the KEV and EPSS feeds |
 | `-refresh` | — | off | Refetch the feeds, ignoring the cache |
+| `-include-testdata` | — | off | Also read directories named `testdata`, which every walk skips by default |
 | `-timeout` | a Go duration, such as `10m` or `90s` | `10m` | Stop the whole run after this long; requests that hit it become gaps |
 
 The path may be given before or after the flags, so `douane scan -fail high /repos` and
@@ -175,9 +176,16 @@ author believes is handled.
 | State | Output | Exit code |
 |---|---|---|
 | Valid | The finding leaves `findings` and every count, and appears under `permitted` in JSON | Not counted |
+| Valid, with a gap of its own | The `severity`, `range` or EPSS-identifier gap the finding raised leaves `gaps` and is listed under the permitted finding's `gaps` | Not counted toward 3 |
 | Lapsed | The finding stays, marked `EXPIRED PERMIT` in text, `permit=expired` in line, `expired_permit` in JSON | 1, whatever `-fail` says |
 | Expires within 14 days | A note on stderr | Unchanged |
 | Lapsed and suppressing nothing | A note on stderr asking to remove it | Unchanged |
+
+A permit covers a gap only when every finding the gap concerns is permitted. The same unrated
+advisory on a second package, or in a second repository of a sweep, that no permit names keeps
+the gap and the exit 3. A gap about the scan itself, such as an unreadable lockfile, a feed
+outage, an advisory record that never arrived or an invalid `douane.yml`, concerns no finding,
+so no permit covers it.
 
 When two entries name the same finding, a valid one wins over a lapsed one, so a permit is
 renewed by adding a fresh entry. Every permit note goes to stderr in every format, `text`
@@ -190,7 +198,9 @@ skipped with `"failed": true` and one `unreadable` gap whose `subject` is `douan
 whose `detail` carries the path and line, and every other repository is swept as usual. The
 sweep then exits like any incomplete one: 3, unless findings at or above `-fail` make it 1,
 and 0 under `-fail never`. The repository is skipped rather than scanned without its permits,
-because that would report as held what its author believes is handled.
+because that would report as held what its author believes is handled. A skipped repository
+writes no history row, so its previous row stays the one the next run compares against and
+its findings do not all read as new once the file is fixed.
 
 ```
 douane: gap: app: unreadable: douane.yml: /src/app/douane.yml:2: permit is missing expires
@@ -275,6 +285,11 @@ feed cache; leave the database enabled if the runner has a cache directory that 
 
 `.git`, `node_modules`, `vendor`, `target`, `dist`, `build`, `.svelte-kit`, `.venv` — these
 hold installed artefacts, and a vendored copy is not a declared dependency.
+
+`testdata` is skipped too, by the lockfile walk, the Dockerfile walk and sweep discovery
+alike. Go leaves it out of every build, so a fixture there, such as a deliberately broken
+`Dockerfile.bad`, is not something the project ships. `-include-testdata` reads it. The scan
+root itself is always read, even when it is called `testdata`.
 
 ## Network
 

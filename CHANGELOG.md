@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Fixed
+- A valid permit now covers the gaps its finding alone raised. An advisory with no severity anywhere raised a `severity` gap that outlived the permit suppressing its finding, so the run stayed incomplete and exited 3. A `severity`, `range` or EPSS-identifier gap leaves `gaps` when every finding it concerns is permitted, and JSON lists it under that finding's `gaps` in `permitted`. In a sweep a fleet gap is covered only when no repository still reports a finding it concerns. A gap about the scan itself, such as an unreadable lockfile, a feed outage, an advisory record that never arrived or an invalid `douane.yml`, is never covered.
+- Directories named `testdata` are skipped by the lockfile walk, the Dockerfile walk and sweep discovery, like `vendor` and `node_modules`. A deliberately broken fixture such as `testdata/Dockerfile.bad` no longer reads as a build file that could not be resolved.
+- A repository a sweep skipped, or one that yielded no package, no longer writes an empty history row. Its previous row stands, so the next good run does not report every finding as new.
 
+### Added
+- `-include-testdata` reads `testdata` directories again.
 - douane is released under the [GNU General Public License v3.0 only](LICENSE) (`GPL-3.0-only`).
 
 ## [v0.7.0] - 2026-11-10
