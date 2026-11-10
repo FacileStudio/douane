@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.3] - 2026-11-10
+
 ### Fixed
 - In a sweep, a failed OSV query or a missing advisory record is now also a gap on every repository it can have emptied, so an outage no longer reads as repositories that are complete with no findings.
 - A response body over the size limit is an error instead of a silently shortened answer.
