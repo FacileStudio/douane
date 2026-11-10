@@ -19,11 +19,13 @@ type permitJSON struct {
 }
 
 // permittedJSON is a finding a valid permit took out of the report, with the
-// permit that did it, so the suppression stays auditable from the json alone.
+// permit that did it and the gaps it covered along with the finding, so the
+// suppression stays auditable from the json alone.
 type permittedJSON struct {
 	finding.Finding
-	Key    string     `json:"key"`
-	Permit permitJSON `json:"permit"`
+	Key    string        `json:"key"`
+	Permit permitJSON    `json:"permit"`
+	Gaps   []finding.Gap `json:"gaps,omitempty"`
 }
 
 func permittedBody(ms []permit.Match) []permittedJSON {
@@ -33,7 +35,7 @@ func permittedBody(ms []permit.Match) []permittedJSON {
 		out = append(out, permittedJSON{Finding: m.Finding, Key: m.Finding.Key(), Permit: permitJSON{
 			ID: p.ID, Package: p.Package, Reason: p.Reason,
 			Expires: p.Expires.Format("2006-01-02"), Line: p.Line,
-		}})
+		}, Gaps: m.Gaps})
 	}
 	return out
 }

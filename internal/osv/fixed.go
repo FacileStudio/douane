@@ -54,9 +54,10 @@ func RangeGaps(v Vuln, pkg finding.Package) []finding.Gap {
 		return nil
 	}
 	return []finding.Gap{{
-		Kind:    finding.GapRange,
-		Subject: pkg.Name,
-		Detail:  v.ID + ": commit ranges only, which a lockfile version cannot be compared against",
+		Kind:     finding.GapRange,
+		Subject:  pkg.Name,
+		Detail:   v.ID + ": commit ranges only, which a lockfile version cannot be compared against",
+		Advisory: v.ID,
 	}}
 }
 

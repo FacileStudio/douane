@@ -8,10 +8,12 @@ import (
 	"github.com/FacileStudio/douane/internal/finding"
 )
 
-// Match pairs a finding with the permit that names it.
+// Match pairs a finding with the permit that names it. Gaps are the gaps that
+// existed only because of this finding, which the permit covers along with it.
 type Match struct {
 	Finding finding.Finding
 	Permit  Permit
+	Gaps    []finding.Gap
 }
 
 // Outcome is one report's findings after its permits were applied. Kept is
@@ -49,9 +51,9 @@ func Apply(fs []finding.Finding, permits []Permit, today time.Time) Outcome {
 			continue
 		case permits[i].Lapsed(today):
 			out.Kept = append(out.Kept, f)
-			out.Expired = append(out.Expired, Match{f, permits[i]})
+			out.Expired = append(out.Expired, Match{Finding: f, Permit: permits[i]})
 		default:
-			out.Permitted = append(out.Permitted, Match{f, permits[i]})
+			out.Permitted = append(out.Permitted, Match{Finding: f, Permit: permits[i]})
 		}
 		used[i] = true
 	}

@@ -166,8 +166,9 @@ func enrichFleet(ctx context.Context, opts options, st *store.Store, repos []*re
 }
 
 // collect ranks each repository, filters it to the requested scope, records
-// its history, applies its permits and orders the fleet so the first group
-// printed is the one to open first.
+// its history, applies its permits, lets those permits cover the fleet gaps
+// only their findings raised, and orders the fleet so the first group printed
+// is the one to open first.
 func collect(repos []*repoScan, st *store.Store, sweep *output.Sweep, scope finding.ScopeFilter, info string) {
 	for _, r := range repos {
 		finding.Rank(r.report.Findings)
@@ -177,5 +178,6 @@ func collect(repos []*repoScan, st *store.Store, sweep *output.Sweep, scope find
 		applyPermits(&r.report, r.permits, permit.Today())
 		sweep.Repos = append(sweep.Repos, r.report)
 	}
+	coverFleetGaps(sweep)
 	output.SortRepos(sweep.Repos)
 }

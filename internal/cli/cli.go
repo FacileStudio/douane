@@ -9,6 +9,7 @@ import (
 	"github.com/FacileStudio/douane/internal/enrich"
 	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/inventory"
+	"github.com/FacileStudio/douane/internal/osv"
 	"github.com/FacileStudio/douane/internal/output"
 	"github.com/FacileStudio/douane/internal/permit"
 	"github.com/FacileStudio/douane/internal/store"
@@ -141,7 +142,7 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 			Subject: target, Detail: "no lockfile found, nothing was inspected"})
 		return report, exitClear
 	}
-	resolve(ctx, pkgs, &report)
+	resolve(ctx, osv.New(), pkgs, &report)
 	if !opts.noEnrich {
 		res := newEnricher(opts, st).Apply(ctx, report.Findings)
 		report.Warnings = append(report.Warnings, enrichWarnings(res)...)

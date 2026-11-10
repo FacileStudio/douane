@@ -29,8 +29,9 @@ func enrGaps(res *Result, malformed []string) []finding.Gap {
 		out = append(out, enrGap(epssFeed, "feed unreachable, scores served from the cache alone"))
 	}
 	for _, id := range malformed {
-		out = append(out, enrGap(epssFeed,
-			fmt.Sprintf("dropped %q: not a CVE identifier, so it was never scored", id)))
+		g := enrGap(epssFeed, fmt.Sprintf("dropped %q: not a CVE identifier, so it was never scored", id))
+		g.Advisory = id
+		out = append(out, g)
 	}
 	return out
 }

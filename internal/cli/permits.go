@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/FacileStudio/douane/internal/finding"
@@ -48,13 +49,16 @@ func attachPermits(repos []*repoScan, today time.Time) {
 }
 
 // applyPermits takes the findings a valid permit covers out of the report and
-// marks the ones a lapsed permit gave back. It runs after the history is
+// marks the ones a lapsed permit gave back. A gap that existed only because of
+// a permitted finding leaves with it and is listed under it, so it neither
+// keeps the run incomplete nor disappears. It runs after the history is
 // recorded, so a permit hides a finding from the output and never from the
 // record of what the project carries.
 func applyPermits(report *output.Report, ps []permit.Permit, today time.Time) {
 	out := permit.Apply(report.Findings, ps, today)
 	report.Findings = out.Kept
 	report.Permitted = out.Permitted
+	report.Gaps = coverGaps(report.Gaps, report.Findings, report.Permitted)
 	report.Expired = map[string]bool{}
 	for _, m := range out.Expired {
 		report.Expired[m.Finding.Key()] = true
@@ -73,4 +77,45 @@ func permitExit(code int, reports ...output.Report) int {
 		}
 	}
 	return code
+}
+
+// coverGaps returns the gaps a permit does not cover, attaching each covered
+// one to every permitted match it concerns. A gap is covered when a permitted
+// finding accounts for it and no finding still in the report does: the same
+// unrated advisory on a package nobody permitted is still a hole in the answer.
+// A gap about the scan itself concerns no finding, so no permit covers it.
+func coverGaps(gaps []finding.Gap, kept []finding.Finding, matches ...[]permit.Match) []finding.Gap {
+	var left []finding.Gap
+	for _, g := range gaps {
+		if slices.ContainsFunc(kept, g.Concerns) || !attachGap(g, matches) {
+			left = append(left, g)
+		}
+	}
+	return left
+}
+
+func attachGap(g finding.Gap, matches [][]permit.Match) bool {
+	found := false
+	for _, ms := range matches {
+		for i := range ms {
+			if g.Concerns(ms[i].Finding) {
+				ms[i].Gaps = append(ms[i].Gaps, g)
+				found = true
+			}
+		}
+	}
+	return found
+}
+
+// coverFleetGaps applies coverGaps to the gaps a sweep holds for the whole
+// fleet, against every repository at once: a fleet gap is covered only when
+// no repository still reports a finding it concerns.
+func coverFleetGaps(sweep *output.Sweep) {
+	var kept []finding.Finding
+	var matches [][]permit.Match
+	for _, r := range sweep.Repos {
+		kept = append(kept, r.Findings...)
+		matches = append(matches, r.Permitted)
+	}
+	sweep.Gaps = coverGaps(sweep.Gaps, kept, matches...)
 }

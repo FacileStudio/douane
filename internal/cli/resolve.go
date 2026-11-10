@@ -14,8 +14,7 @@ import (
 // would report bad input for what is really an upstream outage. Both errors
 // are dropped rather than warned about, because each is the join of the very
 // failures the gaps beside them already name, one gap per failure.
-func resolve(ctx context.Context, pkgs []finding.Package, report *output.Report) {
-	client := osv.New()
+func resolve(ctx context.Context, client *osv.Client, pkgs []finding.Package, report *output.Report) {
 	ids, gaps, _ := client.Query(ctx, pkgs)
 	report.Gaps = append(report.Gaps, gaps...)
 	var flat []string

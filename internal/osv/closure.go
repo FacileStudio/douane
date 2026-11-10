@@ -171,9 +171,10 @@ func severityGaps(held map[string]Vuln, want []string, absent map[string]bool) [
 		}
 		canonical, _ := Canonical(v, absent)
 		gaps = append(gaps, finding.Gap{
-			Kind:    finding.GapSeverity,
-			Subject: canonical,
-			Detail:  "no severity label or scorable CVSS vector in the alias closure",
+			Kind:     finding.GapSeverity,
+			Subject:  canonical,
+			Detail:   "no severity label or scorable CVSS vector in the alias closure",
+			Advisory: canonical,
 		})
 	}
 	return gaps
