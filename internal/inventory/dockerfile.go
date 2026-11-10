@@ -79,14 +79,20 @@ func (b *buildLines) visit(path string, d fs.DirEntry, err error) error {
 	return nil
 }
 
-// file reads one Dockerfile, closing each stage as the next FROM opens it and
-// once more at the end, since the last stage has no FROM to close it.
+// file reads one Dockerfile and hands it to parse.
 func (b *buildLines) file(path string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		b.gap(finding.GapUnreadable, rel(b.root, path), err.Error())
 		return
 	}
+	b.parse(path, data)
+}
+
+// parse walks one Dockerfile's instructions, closing each stage as the next
+// FROM opens it and once more at the end, since the last stage has no FROM to
+// close it.
+func (b *buildLines) parse(path string, data []byte) {
 	var st dockerStage
 	for _, line := range dockerLogicalLines(data) {
 		verb, args, _ := strings.Cut(line, " ")
