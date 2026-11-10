@@ -54,7 +54,9 @@ func TestAFailedQueryMarksEveryRepoWithPackagesIncomplete(t *testing.T) {
 func TestAFailedAdvisoryFetchMarksOnlyTheRepoThatAskedForIt(t *testing.T) {
 	client := fakeOSV(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/querybatch") {
-			var req struct{ Queries []struct{ Package struct{ Name string } } }
+			var req struct {
+				Queries []struct{ Package struct{ Name string } }
+			}
 			_ = json.NewDecoder(r.Body).Decode(&req)
 			var results []map[string]any
 			for _, q := range req.Queries {
