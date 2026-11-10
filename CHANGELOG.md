@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.1] - 2026-11-10
+
 ### Fixed
 - A valid permit now covers the gaps its finding alone raised. An advisory with no severity anywhere raised a `severity` gap that outlived the permit suppressing its finding, so the run stayed incomplete and exited 3. A `severity`, `range` or EPSS-identifier gap leaves `gaps` when every finding it concerns is permitted, and JSON lists it under that finding's `gaps` in `permitted`. In a sweep a fleet gap is covered only when no repository still reports a finding it concerns. A gap about the scan itself, such as an unreadable lockfile, a feed outage, an advisory record that never arrived or an invalid `douane.yml`, is never covered.
 - Directories named `testdata` are skipped by the lockfile walk, the Dockerfile walk and sweep discovery, like `vendor` and `node_modules`. A deliberately broken fixture such as `testdata/Dockerfile.bad` no longer reads as a build file that could not be resolved.
