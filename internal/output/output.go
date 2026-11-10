@@ -16,10 +16,11 @@ type Format string
 // Supported output formats. Auto resolves to Text on a terminal and Line
 // everywhere else, so piped and agent-driven runs get the parseable form.
 const (
-	Auto Format = "auto"
-	Text Format = "text"
-	Line Format = "line"
-	JSON Format = "json"
+	Auto  Format = "auto"
+	Text  Format = "text"
+	Line  Format = "line"
+	JSON  Format = "json"
+	SARIF Format = "sarif"
 )
 
 // Layout selects how findings are arranged: grouped by the fix that clears
@@ -84,17 +85,17 @@ func (r Report) Complete() bool { return len(r.Gaps) == 0 }
 func Write(w io.Writer, f Format, r Report) error { return WriteTo(w, w, f, LayoutFix, r) }
 
 // WriteTo renders the report, sending the data to out and the notes — gaps and
-// warnings — to errw. In line and json form that separation is the whole
-// point: what stdout carries is then findings and nothing else, and a warning
-// can no longer be mistaken for one by whatever is grepping the stream. Text
-// is a single narrative for a human, so it stays on one writer, except for
-// permit notes, which go to errw in every format. The layout picks grouped or
-// flat; json ignores it and always emits both shapes.
+// warnings — to errw. In line, json and sarif form that separation is the
+// whole point: what stdout carries is then findings and nothing else, and a
+// warning can no longer be mistaken for one by whatever is grepping the
+// stream. Text is a single narrative for a human, so it stays on one writer,
+// except for permit notes, which go to errw in every format. The layout picks
+// grouped or flat; json and sarif ignore it.
 func WriteTo(out, errw io.Writer, f Format, l Layout, r Report) error {
 	if err := writePermitNotes(errw, "", r.PermitNotes); err != nil {
 		return err
 	}
-	if f == JSON || f == Line {
+	if f == JSON || f == Line || f == SARIF {
 		if err := writeNotes(errw, "", r.Gaps, r.Warnings); err != nil {
 			return err
 		}
@@ -102,6 +103,8 @@ func WriteTo(out, errw io.Writer, f Format, l Layout, r Report) error {
 	switch f {
 	case JSON:
 		return encodeJSON(out, r)
+	case SARIF:
+		return encodeJSON(out, sarifReport(r))
 	case Line:
 		return writeLines(out, "", r, l)
 	default:

@@ -24,7 +24,8 @@ Usage:
 The path may be given before or after the flags.
 
 Flags:
-  -format auto|text|line|json   output shape (default auto)
+  -format auto|text|line|json|sarif
+                                output shape (default auto)
   -by     fix|finding           group by the fix that clears findings (default fix),
                                 or print every finding on its own
   -fail   never|any|low|medium|high|critical|kev

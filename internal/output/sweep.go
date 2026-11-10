@@ -53,7 +53,7 @@ func WriteSweepTo(out, errw io.Writer, f Format, l Layout, s Sweep) error {
 	if err := writeSweepPermitNotes(errw, s); err != nil {
 		return err
 	}
-	if f == JSON || f == Line {
+	if f == JSON || f == Line || f == SARIF {
 		if err := writeSweepNotes(errw, s); err != nil {
 			return err
 		}
@@ -61,6 +61,8 @@ func WriteSweepTo(out, errw io.Writer, f Format, l Layout, s Sweep) error {
 	switch f {
 	case JSON:
 		return encodeJSON(out, s)
+	case SARIF:
+		return encodeJSON(out, sarifSweep(s))
 	case Line:
 		return writeSweepLine(out, s, l)
 	default:

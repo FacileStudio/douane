@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "douane",
+          "informationUri": "https://github.com/FacileStudio/douane",
+          "rules": [
+            {
+              "id": "GHSA-aaaa-bbbb-cccc",
+              "shortDescription": {
+                "text": "header smuggling"
+              },
+              "helpUri": "https://osv.dev/vulnerability/GHSA-aaaa-bbbb-cccc"
+            },
+            {
+              "id": "GO-2026-2",
+              "shortDescription": {
+                "text": "GO-2026-2"
+              },
+              "helpUri": "https://osv.dev/vulnerability/GO-2026-2"
+            },
+            {
+              "id": "RUSTSEC-2026-1",
+              "shortDescription": {
+                "text": "RUSTSEC-2026-1"
+              },
+              "helpUri": "https://osv.dev/vulnerability/RUSTSEC-2026-1"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "GHSA-aaaa-bbbb-cccc",
+          "level": "error",
+          "message": {
+            "text": "chi 5.0.0 is affected by GHSA-aaaa-bbbb-cccc: header smuggling. Fixed in 5.0.12."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "go.mod"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "Go|chi|5.0.0|GHSA-aaaa-bbbb-cccc"
+          }
+        },
+        {
+          "ruleId": "GHSA-aaaa-bbbb-cccc",
+          "level": "error",
+          "message": {
+            "text": "chi 4.11.0 is affected by GHSA-aaaa-bbbb-cccc: header smuggling. Fixed in 5.0.12."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "apps/api/go.mod"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "Go|chi|4.11.0|GHSA-aaaa-bbbb-cccc"
+          }
+        },
+        {
+          "ruleId": "GO-2026-2",
+          "level": "warning",
+          "message": {
+            "text": "chi 5.0.0 is affected by GO-2026-2. No fix is available. EXPIRED PERMIT: the permit for this finding has lapsed."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "go.mod"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "Go|chi|5.0.0|GO-2026-2"
+          }
+        },
+        {
+          "ruleId": "RUSTSEC-2026-1",
+          "level": "note",
+          "message": {
+            "text": "time 5.0.0 is affected by RUSTSEC-2026-1. Fixed in 5.0.12."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Cargo.lock"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "crates.io|time|5.0.0|RUSTSEC-2026-1"
+          }
+        }
+      ]
+    }
+  ]
+}
