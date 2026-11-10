@@ -1,9 +1,13 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/permit"
+	"github.com/FacileStudio/douane/internal/store"
 )
 
 func flawNamedBoth(reportedAs string) finding.Finding {
@@ -42,5 +46,35 @@ func TestSeenBeforeStillCallsAnUnknownFlawNew(t *testing.T) {
 
 	if seenBefore(previous, other) {
 		t.Fatal("an unrelated flaw was treated as already seen")
+	}
+}
+
+func TestASkippedRepoKeepsItsPreviousHistory(t *testing.T) {
+	root, db := t.TempDir(), filepath.Join(t.TempDir(), "douane.db")
+	for _, tc := range []struct{ repo, file, body string }{
+		{"permit", permit.FileName, permitMissingExpiry},
+		{"lockfile", "package-lock.json", "{not json"},
+	} {
+		repo := filepath.Join(root, tc.repo)
+		write(t, filepath.Join(repo, ".git", "HEAD"), "ref: refs/heads/main")
+		write(t, filepath.Join(repo, tc.file), tc.body)
+		st, err := store.Open(db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		held := flawNamedBoth("CVE")
+		if err := st.Save(repo, 3, []finding.Finding{held}); err != nil {
+			t.Fatal(err)
+		}
+		st.Close()
+		cliStderr(t, func() {
+			capture(t, &os.Stdout, func() { Run([]string{"sweep", "-db", db, "-no-enrich", "-format", "json", root}) })
+		})
+		st, _ = store.Open(db)
+		previous, err := st.PreviousKeys(repo)
+		st.Close()
+		if err != nil || !previous[held.Key()] {
+			t.Fatalf("%s: previous = %v, %v; a skipped repo overwrote its history", tc.repo, previous, err)
+		}
 	}
 }

@@ -68,9 +68,12 @@ func seenBefore(previous map[string]bool, f finding.Finding) bool {
 
 // record files this run so the next one can say what is new. A history that
 // cannot be written costs the NEW badge, never the scan, so it degrades to a
-// warning rather than an exit code.
+// warning rather than an exit code. A repository that failed, or yielded no
+// package to inspect, files nothing: an empty row would stand as its newest
+// sweep, and the next good run would call every finding it holds new. Its
+// previous row stays the one the next run is compared against.
 func record(st *store.Store, report *output.Report) {
-	if st == nil {
+	if st == nil || report.Failed || report.Packages == 0 {
 		return
 	}
 	if err := history(st, report); err != nil {
