@@ -51,26 +51,39 @@ func TestAFailedQueryMarksEveryRepoWithPackagesIncomplete(t *testing.T) {
 	}
 }
 
-func TestAFailedAdvisoryFetchMarksOnlyTheRepoThatAskedForIt(t *testing.T) {
-	client := fakeOSV(t, func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/querybatch") {
-			var req struct {
-				Queries []struct{ Package struct{ Name string } }
-			}
-			_ = json.NewDecoder(r.Body).Decode(&req)
-			var results []map[string]any
-			for _, q := range req.Queries {
-				if q.Package.Name == "left-pad" {
-					results = append(results, map[string]any{"vulns": []map[string]string{{"id": "GHSA-gone-0000-0000"}}})
-					continue
-				}
-				results = append(results, map[string]any{})
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
-			return
+type batchRequest struct {
+	Queries []struct {
+		Package struct{ Name string }
+	}
+}
+
+func batchResults(req batchRequest) []map[string]any {
+	results := make([]map[string]any, 0, len(req.Queries))
+	for _, q := range req.Queries {
+		if q.Package.Name != "left-pad" {
+			results = append(results, map[string]any{})
+			continue
 		}
+		results = append(results, map[string]any{"vulns": []map[string]string{{"id": "GHSA-gone-0000-0000"}}})
+	}
+	return results
+}
+
+func serveBatchThenFailDetails(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasSuffix(r.URL.Path, "/querybatch") {
 		http.Error(w, "unavailable", http.StatusBadRequest)
-	})
+		return
+	}
+	var req batchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]any{"results": batchResults(req)})
+}
+
+func TestAFailedAdvisoryFetchMarksOnlyTheRepoThatAskedForIt(t *testing.T) {
+	client := fakeOSV(t, serveBatchThenFailDetails)
 	a, b := repoWith("a", "left-pad"), repoWith("b", "hono")
 	var sweep output.Sweep
 
