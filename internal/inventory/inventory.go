@@ -88,9 +88,12 @@ func Scan(root string, o Options) ([]finding.Package, []finding.Gap, error) {
 // walks of the same tree ask different questions of it, so the deduplication
 // belongs here rather than in either of them: the same subject and the same
 // detail is the same unanswered question however many files raised it.
+// annotation marks every gap the walk records as one about a label on the
+// findings, as the Dockerfile walk's are, rather than about which exist.
 type gapSet struct {
-	noted map[string]bool
-	gaps  []finding.Gap
+	noted      map[string]bool
+	gaps       []finding.Gap
+	annotation bool
 }
 
 // gap records one unanswered question, unless it has already been recorded.
@@ -100,7 +103,7 @@ func (g *gapSet) gap(kind finding.GapKind, subject, detail string) {
 		return
 	}
 	g.noted[key] = true
-	g.gaps = append(g.gaps, finding.Gap{Kind: kind, Subject: subject, Detail: detail})
+	g.gaps = append(g.gaps, finding.Gap{Kind: kind, Subject: subject, Detail: detail, Annotation: g.annotation})
 }
 
 func rel(root, path string) string {

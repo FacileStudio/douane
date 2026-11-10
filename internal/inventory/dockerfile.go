@@ -44,7 +44,7 @@ type buildLines struct {
 func BuildLines(root string, o Options) (map[string]string, []finding.Gap) {
 	b := &buildLines{
 		opts:   o,
-		gapSet: gapSet{noted: map[string]bool{}},
+		gapSet: gapSet{noted: map[string]bool{}, annotation: true},
 		lines:  map[string]string{},
 	}
 	abs, err := filepath.Abs(root)

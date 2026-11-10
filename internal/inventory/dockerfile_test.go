@@ -142,6 +142,9 @@ func TestBuildLinesUntaggedImageIsAGap(t *testing.T) {
 	if len(gaps) != 1 || gaps[0].Kind != finding.GapUnresolved {
 		t.Fatalf("gaps = %+v, want one unresolved gap", gaps)
 	}
+	if gaps[0].HidesFindings() {
+		t.Fatalf("gap = %+v: a build line only labels findings, it cannot hide one", gaps[0])
+	}
 	invWantLines(t, lines, map[string]string{})
 }
 

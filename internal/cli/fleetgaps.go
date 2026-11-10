@@ -29,14 +29,8 @@ func flatIDs(ids map[string][]string) []string {
 	return slices.Compact(flat)
 }
 
-// hidesFindings reports a fleet gap that can stand for findings douane never
-// saw: a query that failed, or an advisory whose record never arrived. Severity
-// and range gaps only qualify findings that were reported.
-func hidesFindings(g finding.Gap) bool {
-	return g.Kind == finding.GapUpstream || g.Kind == finding.GapUnresolved
-}
-
-// repoGaps picks the fleet gaps one repository inherits. A failed query cannot
+// repoGaps picks the fleet gaps one repository inherits: those that can hide
+// findings, as Gap.HidesFindings classifies them. A failed query cannot
 // be pinned on a package with certainty, so every repository with packages
 // takes it; a failed advisory fetch names its advisory, so only repositories
 // whose packages asked for it do.
@@ -47,7 +41,7 @@ func repoGaps(pkgs []finding.Package, ids map[string][]string, query, fetch []fi
 	asked := askedIDs(pkgs, ids)
 	var out []finding.Gap
 	for _, g := range append(slices.Clone(query), fetch...) {
-		if !hidesFindings(g) {
+		if !g.HidesFindings() {
 			continue
 		}
 		if g.Kind == finding.GapUnresolved && !asked[g.Subject] {

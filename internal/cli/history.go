@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/FacileStudio/douane/internal/finding"
 	"github.com/FacileStudio/douane/internal/output"
@@ -68,12 +69,17 @@ func seenBefore(previous map[string]bool, f finding.Finding) bool {
 
 // record files this run so the next one can say what is new. A history that
 // cannot be written costs the NEW badge, never the scan, so it degrades to a
-// warning rather than an exit code. A repository that failed, or yielded no
-// package to inspect, files nothing: an empty row would stand as its newest
-// sweep, and the next good run would call every finding it holds new. Its
-// previous row stays the one the next run is compared against.
+// warning rather than an exit code. A repository that failed, yielded no
+// package to inspect, or carries a gap that can hide findings files nothing:
+// a row missing findings would stand as its newest sweep, and the next
+// complete run would call every finding it missed new. Its previous row stays
+// the one the next run is compared against. A gap that only qualifies a
+// reported finding, such as a missing severity, does not stop the write.
 func record(st *store.Store, report *output.Report) {
 	if st == nil || report.Failed || report.Packages == 0 {
+		return
+	}
+	if slices.ContainsFunc(report.Gaps, finding.Gap.HidesFindings) {
 		return
 	}
 	if err := history(st, report); err != nil {

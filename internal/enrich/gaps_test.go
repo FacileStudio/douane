@@ -24,6 +24,11 @@ func TestDeadKEVFeedLeavesAGap(t *testing.T) {
 	if !enrGapAbout(res.Gaps, kevFeed) {
 		t.Fatalf("-fail kev would have measured nothing and passed, gaps: %v", res.Gaps)
 	}
+	for _, g := range res.Gaps {
+		if g.HidesFindings() {
+			t.Fatalf("gap = %+v: a feed outage leaves scores out, never findings", g)
+		}
+	}
 }
 
 func TestStaleCatalogueLeavesAGap(t *testing.T) {

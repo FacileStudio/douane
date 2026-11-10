@@ -25,12 +25,34 @@ const (
 // simply being absent — all render an incomplete scan as a clean one.
 // Advisory is set only on a gap that exists because of one advisory's
 // findings, never on a gap about the scan itself, and is what lets a permit
-// for those findings cover it.
+// for those findings cover it. Annotation is set on a gap about something
+// douane adds to the findings it did report, a KEV or EPSS score or the
+// release line a Dockerfile builds with, never on one about which findings
+// exist.
 type Gap struct {
-	Kind     GapKind `json:"kind"`
-	Subject  string  `json:"subject"`
-	Detail   string  `json:"detail"`
-	Advisory string  `json:"-"`
+	Kind       GapKind `json:"kind"`
+	Subject    string  `json:"subject"`
+	Detail     string  `json:"detail"`
+	Advisory   string  `json:"-"`
+	Annotation bool    `json:"-"`
+}
+
+// HidesFindings is the one place gaps are classified by what they can cost.
+// It reports whether g can stand for findings douane never saw: a vulnerability
+// query that failed, a lockfile it could not read or does not support, an
+// advisory or package it could not resolve. Those keep a run from writing the
+// history it would compare the next one against. A severity or range gap only
+// qualifies a finding that was reported, and an annotation gap only a label on
+// one, so neither hides anything. An unknown kind hides, because guessing the
+// other way would let a new kind of hole pass as a complete answer.
+func (g Gap) HidesFindings() bool {
+	switch g.Kind {
+	case GapSeverity, GapRange:
+		return false
+	case GapUpstream, GapUnreadable, GapUnsupported, GapUnresolved:
+		return !g.Annotation
+	}
+	return true
 }
 
 // Concerns reports whether g exists only because of f. A range gap is about

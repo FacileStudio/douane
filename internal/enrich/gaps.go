@@ -37,7 +37,7 @@ func enrGaps(res *Result, malformed []string) []finding.Gap {
 }
 
 func enrGap(subject, detail string) finding.Gap {
-	return finding.Gap{Kind: finding.GapUpstream, Subject: subject, Detail: detail}
+	return finding.Gap{Kind: finding.GapUpstream, Subject: subject, Detail: detail, Annotation: true}
 }
 
 func enrAge(d time.Duration) string {
