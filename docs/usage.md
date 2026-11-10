@@ -9,7 +9,7 @@ Defaults to the current directory.
 
 | Flag | Values | Default | Effect |
 |---|---|---|---|
-| `-format` | `auto`, `text`, `line`, `json` | `auto` | Output shape |
+| `-format` | `auto`, `text`, `line`, `json`, `sarif` | `auto` | Output shape |
 | `-fail` | `never`, `any`, `low`, `medium`, `high`, `critical`, `kev` | `never` | Exit 1 at or above |
 | `-scope` | `all`, `prod`, `dev` | `all` | Filter findings by how far they reach a runtime |
 | `-informational` | `warn`, `fail`, `ignore` | `warn` | How to treat RUSTSEC informational defects |
@@ -107,15 +107,26 @@ npm:shell-quote@1.8.3: critical: CVE-2026-9277 [bun.lock epss=0.0085 kev=false f
 
 **json** carries the full report: `schema_version`, `complete`, the `gaps` array, and every finding
 with its `key`, its `new` flag, `aliases`, the CVSS vector and the `exploit` block. `findings`
-and `gaps` are always arrays, so a consumer counts them without a null check.
+and `gaps` are always arrays, so a consumer counts them without a null check. `permitted`
+lists every finding a valid permit took out of `findings`, each with its `permit`, and a
+finding a lapsed permit gave back carries `"expired_permit": true`.
+
+**sarif** is SARIF 2.1.0, for code-scanning uploads such as `github/codeql-action/upload-sarif`.
+One run, one rule per advisory id, one result per finding. A result's location is the lockfile
+path with no region, because a dependency has no line. Its `partialFingerprints` carries
+`primaryLocationLineHash` set to the finding's history key (`ecosystem|package|version|id`),
+so the consumer does not derive one from lockfile lines and move the alert on every reformat.
+Level follows severity: critical and high are `error`, medium is `warning`, low and unknown
+are `note`. In a sweep, each path and fingerprint is prefixed with the repository name. Gaps
+and warnings go to stderr, as in `line` and `json`.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | 0 | Clear, or findings below `-fail`, over a complete scan |
-| 1 | Findings at or above `-fail` |
-| 2 | Bad usage, or a target douane cannot start from |
+| 1 | Findings at or above `-fail`, or a finding whose permit has lapsed, whatever `-fail` says |
+| 2 | Bad usage, a target douane cannot start from, or an invalid `douane.yml` |
 | 3 | Scan incomplete: douane could not determine part of the answer |
 
 **3 is the one to read twice.** `-fail` is a claim about what was found, and douane can
@@ -134,6 +145,47 @@ under `-fail never` must read `complete` and `gaps` itself, at the root or per r
 `-fail kev` ignores severity entirely and fails only when something in the tree is on
 CISA's known-exploited list. On this fleet it has never fired, so treat it as a tripwire
 rather than a gate.
+
+## Permits
+
+`douane.yml` at the root of a scanned project suppresses findings until a date:
+
+```yaml
+permits:
+  - id: GHSA-xxxx-xxxx-xxxx
+    package: golang.org/x/crypto
+    reason: no fix published, not reachable from the API
+    expires: 2027-01-31
+```
+
+| Key | Required | Meaning |
+|---|---|---|
+| `id` | yes | Any name of the advisory: CVE, GHSA or the ecosystem's own id |
+| `package` | no | Narrows the match to one package |
+| `reason` | yes | Why the finding is acceptable for now |
+| `expires` | yes | `YYYY-MM-DD`, the last day the permit holds, at most 365 days ahead |
+
+The file is a strict subset of YAML: a top-level `permits:` list of flat `key: value`
+entries, values plain or quoted on one line, `#` comments allowed. douane exits 2 with the
+path and line for a missing `id`, `reason` or `expires`, an unknown or repeated key, a date
+that does not parse or lies more than 365 days ahead, or any YAML construct outside that
+subset. It never skips an entry it cannot read, because a skipped permit is a finding its
+author believes is handled.
+
+| State | Output | Exit code |
+|---|---|---|
+| Valid | The finding leaves `findings` and every count, and appears under `permitted` in JSON | Not counted |
+| Lapsed | The finding stays, marked `EXPIRED PERMIT` in text, `permit=expired` in line, `expired_permit` in JSON | 1, whatever `-fail` says |
+| Expires within 14 days | A note on stderr | Unchanged |
+| Lapsed and suppressing nothing | A note on stderr asking to remove it | Unchanged |
+
+When two entries name the same finding, a valid one wins over a lapsed one, so a permit is
+renewed by adding a fresh entry. Every permit note goes to stderr in every format, `text`
+included. Permits apply after the history is recorded, so a permitted finding still counts
+as seen and does not read as new on the day its permit lapses.
+
+In a sweep, each repository reads its own `douane.yml` and nothing else. An invalid file in
+any repository stops the sweep with exit 2.
 
 ## Gaps
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Permits: `douane.yml` at a project's root suppresses a finding by any of its names, optionally narrowed to one package. Every entry needs a `reason` and an `expires` date at most 365 days ahead; a missing field, an unknown key or a bad date exits 2 with the file and line. A permitted finding leaves the output and the `-fail` calculation and is listed under `permitted` in JSON. A lapsed permit returns its finding marked `EXPIRED PERMIT` and exits 1 whatever `-fail` says. Permits expiring within 14 days are listed on stderr on every run. In a sweep, each repository reads its own file only.
+- `-format sarif` writes SARIF 2.1.0: one rule per advisory, one result per finding at its lockfile with no region, fingerprinted with the finding's history key.
+- Fuzz targets for every parser of untrusted input: go.mod, package-lock.json, bun.lock and its JSONC reader, Cargo.lock, Dockerfiles, OSV version comparison, CVSS v3 vectors and douane.yml.
+
+### Changed
+- The JSON report carries a `permitted` array, always present, and `expired_permit` on a finding a lapsed permit gave back. Groups carry `expired_permits`. A line-format finding a lapsed permit gave back ends its bracket with `permit=expired`.
+
 ## [v0.6.3] - 2026-11-10
 
 ### Fixed

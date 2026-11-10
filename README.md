@@ -53,7 +53,8 @@ mise run install          # GOBIN=$HOME/go/bin go install .
 douane scan  [path] [flags]   inspect one project
 douane sweep [dir]  [flags]   inspect every repository under a directory
 
-  -format auto|text|line|json   output shape (default auto)
+  -format auto|text|line|json|sarif
+                                output shape (default auto)
   -by     fix|finding           group by the fix that clears findings (default fix),
                                 or print one block per finding
   -fail   never|any|low|medium|high|critical|kev
@@ -86,14 +87,45 @@ one decision, so they print once with a count instead of twice. `-by finding` re
 flat per-finding list. JSON always carries both shapes: `findings` untouched, plus a derived
 `groups` array.
 
+`-format sarif` writes SARIF 2.1.0 for code-scanning uploads: one rule per advisory, one
+result per finding, located at its lockfile with no line, and fingerprinted with the same
+key the history uses so an alert survives a reformatted lockfile.
+
+## Permits
+
+A finding you have decided to live with for now goes in `douane.yml` at the project's root:
+
+```yaml
+permits:
+  - id: GHSA-xxxx-xxxx-xxxx
+    package: golang.org/x/crypto
+    reason: no fix published, not reachable from the API
+    expires: 2027-01-31
+```
+
+`id` matches any name the finding goes by, CVE, GHSA or the ecosystem's own. `package` is
+optional and narrows the match. `reason` and `expires` are mandatory, and `expires` may be at
+most 365 days ahead: a permit is temporary, and one without an end is how a finding vanishes
+for good. douane refuses a file with a missing field, an unknown key or a bad date with exit 2
+and the line at fault.
+
+A valid permit takes its finding out of the output and the `-fail` calculation; JSON lists it
+under `permitted` with its reason. On the day after `expires`, the finding comes back marked
+**EXPIRED PERMIT** and the run exits 1 whatever `-fail` says. Permits expiring within 14 days
+are listed on stderr on every run. In a sweep, each repository's `douane.yml` applies to that
+repository only. Commit the file: the reason and the date are the audit trail.
+
 ## Exit codes
 
 ```
 0  clear
-1  findings at or above -fail
-2  bad usage or unreadable input
+1  findings at or above -fail, or a finding whose permit has lapsed
+2  bad usage or unreadable input, an invalid douane.yml included
 3  scan incomplete — douane could not determine part of the answer
 ```
+
+Permits add no exit code. A lapsed permit is a finding, so it exits 1; an invalid permit file
+is unreadable input, so it exits 2.
 
 `-fail` is a claim about what was found, and douane can only make that claim over a
 complete scan. So anything it could not determine exits **3**, never 0: an OSV chunk that
@@ -153,7 +185,7 @@ auto` already uses. `NO_COLOR=1` or `TERM=dumb` turns it off. Glyphs degrade to 
 `|` when the environment never declared a UTF-8 locale, because a mojibake diamond is worse
 than a plain one.
 
-**`line` and `json` are never coloured, even on a terminal**, since they are the formats a pipe
+**`line`, `json` and `sarif` are never coloured, even on a terminal**, since they are the formats a pipe
 and an agent consume. The decision is made per stream, so `douane sweep > report.txt` still
 colours the gaps on your terminal while leaving the file plain.
 
@@ -195,5 +227,6 @@ See [ROADMAP.md](ROADMAP.md).
 
 ## Data handling
 
-Findings are a live map of your attack surface. The sweep database, any inventory and any
-suppression file are gitignored and must stay that way — including in fixtures and examples.
+Findings are a live map of your attack surface. The sweep database and any inventory are
+gitignored and must stay that way, including in fixtures and examples. A scanned project's
+`douane.yml` is the exception and belongs in that project's history.

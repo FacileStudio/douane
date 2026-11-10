@@ -180,7 +180,7 @@ Evidence, not milestone numbers, sets this. Reordered 2026-08-28 against the v0.
     matches how the answer changes. Do it once the count is survivable, not before.
 11. **v3** deployed-or-not. Still the sharpest judgment axis, and now the one that separates the
     92% EPSS finding in a PoC from the same finding in production.
-12. **v1.1** permits, then **v5.3** the introduced-finding gate. A repo cannot go green honestly
+12. ~~**v1.1** permits~~, shipped 2026-11-10, then **v5.3** the introduced-finding gate. A repo cannot go green honestly
     without permits, and CI cannot gate on anything until it can.
 13. **v2.1** govulncheck, **demoted**. After the chore its addressable set is 124 findings, not
     2003. Still the only reachability there is, but it is no longer the headline.
@@ -289,7 +289,7 @@ against, so ≤250 no longer applies as written.
 
 **Depends on.** Nothing. Sharper after v1.3.
 
-### v1.1 Permits (suppressions with mandatory expiry)
+### v1.1 Permits (suppressions with mandatory expiry), shipped 2026-11-10
 
 **Why.** Without suppression the output never shrinks and stops being read. With unbounded
 suppression, findings vanish permanently and the tool lies. The name already settled this: a
@@ -300,9 +300,23 @@ baseline — at 732 findings the permit file would be the bigger liability.
 rejected at parse time if missing. douane **fails loudly** when a permit lapses rather than
 silently reinstating the finding, and lists permits expiring within 14 days on every run.
 
-**Exit criterion.** A suppressed finding disappears from output; the same finding reappears with
+**Exit criterion, met.** A suppressed finding disappears from output; the same finding reappears with
 an `EXPIRED PERMIT` marker once its date passes; an entry missing `expires:` exits 2 with a
 message naming the line.
+
+**Shipped.** `internal/permit` reads a strict subset of YAML with no new dependency: a
+top-level `permits:` list of flat entries, every unknown key, repeated key, bad date or YAML
+construct outside the subset refused with its line. `expires` may be at most 365 days ahead.
+`id` matches any alias, `package` narrows. A lapsed permit exits 1 whatever `-fail` says;
+permits expiring within 14 days and lapsed ones that suppress nothing are noted on stderr in
+every format. In a sweep each repository reads only its own `douane.yml`. Measured: the three
+criteria are `TestAPermittedFindingLeavesTheOutputAndTheGate`,
+`TestALapsedPermitReturnsTheFindingAndFailsTheRun` (exit 1 under `-fail never`) and
+`TestScanRefusesAPermitWithoutExpiry` (a real `douane scan` run, exit 2,
+`douane.yml:2: permit is missing expires`, before any network call). `FuzzParse` ran 2.2M
+inputs in 60s with no crash. Shipped alongside: `-format sarif` (douane's own tree: 57 rules,
+57 results, valid JSON) and fuzz targets for every untrusted-input parser, all nine of which
+survived 60s each with no crash found.
 
 **Depends on.** Nothing.
 
