@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A gap that concerns only findings `-scope` filtered out no longer counts toward exit 3. A `severity` gap for an advisory whose only finding is dev-only, under `-scope prod`, kept the run incomplete although the reader chose not to look at that finding. Such a gap leaves `gaps` and is listed under `out_of_scope_gaps` in JSON, on the repository and, for a fleet gap, at the sweep's root. A gap that also concerns a finding still in scope stays, and a gap about the scan itself concerns no finding, so the scope never removes it.
+- A run carrying a gap that can hide findings for a repository writes no history row for it: a failed OSV query, an unreadable or unsupported lockfile among readable ones, an advisory or package that did not resolve. The previous row stays, so the next complete run does not report the findings this run missed as NEW. A gap that only qualifies a reported finding (`severity`, `range`) or a label on one (a KEV or EPSS feed outage, a Dockerfile build line douane could not read) does not block the write. `Gap.HidesFindings` is the one place that classifies gaps this way.
+
 ## [v0.7.1] - 2026-11-10
 
 ### Fixed

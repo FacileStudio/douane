@@ -265,6 +265,13 @@ findings above the threshold and a gap exits 1. `douane scan .` on this repo rep
 The suite sweep reports 29 repos including `hooks`, which declares no dependencies at all and
 used to vanish. `douane --version` prints one line.
 
+**Amended 2026-11-10 (v0.7.2).** The six kinds are now also classified by what they can cost,
+in one place, `Gap.HidesFindings`: `upstream`, `unreadable`, `unsupported` and `unresolved` can
+stand for findings douane never saw, `severity` and `range` qualify a reported finding, and a
+gap about a label (KEV, EPSS, a Dockerfile build line) hides nothing. A repository carrying a gap
+that can hide findings writes no history row, so the next complete run does not call what it
+missed NEW.
+
 **Depends on.** Nothing.
 
 ### v1.4 Report by fix, not by finding — DONE 2026-08-24
@@ -483,6 +490,10 @@ the 305 difference is exactly the `dev` set, and no scope leaks across either fi
 pulled in by both a runtime and a build dependency reports `prod`. Spot-check confirmed the
 demotion is correct, not just consistent: vitrine's `hono`/`express`/`qs` are dev because the
 only path to them is root devDependencies → `shadcn` → `@modelcontextprotocol/sdk`.
+
+**Amended 2026-11-10 (v0.7.2).** A gap that concerns only findings the scope filtered out, such as
+the `severity` gap of a dev-only finding under `-scope prod`, no longer exits 3 and moves to
+`out_of_scope_gaps` in JSON, as a permitted finding's gap does since v0.7.1.
 
 **Depends on.** Nothing. Cheaper and larger than v2.1; do it first.
 

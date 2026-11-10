@@ -114,7 +114,9 @@ A valid permit takes its finding out of the output and the `-fail` calculation; 
 under `permitted` with its reason. A gap that exists only because of that finding, such as
 an advisory with no severity anywhere, goes with it: JSON lists it under the permitted
 finding and it no longer makes the run exit 3. A gap about the scan itself, such as an
-unreadable lockfile or a feed outage, is never covered by a permit. On the day after `expires`, the finding comes back marked
+unreadable lockfile or a feed outage, is never covered by a permit. `-scope` does the same for
+a gap that concerns only findings it filtered out: JSON lists it under `out_of_scope_gaps` and it
+does not make the run exit 3. On the day after `expires`, the finding comes back marked
 **EXPIRED PERMIT** and the run exits 1 whatever `-fail` says. Permits expiring within 14 days
 are listed on stderr on every run. In a sweep, each repository's `douane.yml` applies to that
 repository only, and an invalid one costs that repository alone: it is skipped and reported
@@ -139,6 +141,10 @@ complete scan. So anything it could not determine exits **3**, never 0: an OSV c
 came back an error, a lockfile it cannot parse, an ecosystem it cannot read. CI can then
 tell "you are vulnerable" from "I could not tell" and retry the second before blocking on
 it.
+
+A gap that can hide findings, such as a failed OSV query or an unreadable lockfile, also keeps
+that repository from writing its history row, so the next complete run does not call what this
+one missed NEW.
 
 Findings still outrank incompleteness. A run that has both exits 1, because both block and
 "you are vulnerable" is the finished answer. Under `-fail never` the gaps print and appear

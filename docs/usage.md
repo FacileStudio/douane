@@ -110,7 +110,8 @@ npm:shell-quote@1.8.3: critical: CVE-2026-9277 [bun.lock epss=0.0085 kev=false f
 with its `key`, its `new` flag, `aliases`, the CVSS vector and the `exploit` block. `findings`
 and `gaps` are always arrays, so a consumer counts them without a null check. `permitted`
 lists every finding a valid permit took out of `findings`, each with its `permit`, and a
-finding a lapsed permit gave back carries `"expired_permit": true`.
+finding a lapsed permit gave back carries `"expired_permit": true`. `out_of_scope_gaps`, present
+only when there is one, lists the gaps `-scope` set aside.
 
 **sarif** is SARIF 2.1.0, for code-scanning uploads such as `github/codeql-action/upload-sarif`.
 One run, one rule per advisory id, one result per finding. A result's location is the lockfile
@@ -187,6 +188,15 @@ the gap and the exit 3. A gap about the scan itself, such as an unreadable lockf
 outage, an advisory record that never arrived or an invalid `douane.yml`, concerns no finding,
 so no permit covers it.
 
+### Gaps and `-scope`
+
+`-scope` sets gaps aside the same way a permit does. A gap that concerns only findings the scope
+filtered out, such as the `severity` gap of an advisory whose only finding is dev-only under
+`-scope prod`, leaves `gaps`, no longer makes the run exit 3, and is listed under
+`out_of_scope_gaps` in JSON: on the repository, and at the root for a fleet gap no repository
+still holds in scope. A gap that also concerns a finding still in scope stays. A gap about the
+scan itself concerns no finding, so `-scope` never removes it.
+
 When two entries name the same finding, a valid one wins over a lapsed one, so a permit is
 renewed by adding a fresh entry. Every permit note goes to stderr in every format, `text`
 included. Permits apply after the history is recorded, so a permitted finding still counts
@@ -250,6 +260,20 @@ douane: gap: binrepo: unreadable: bun.lockb: binary bun lockfile is unreadable, 
 
 An `unsupported` gap is the one to act on rather than retry: it will still be there tomorrow.
 `upstream` is the one to retry. Both exit 3.
+
+### Gaps and the history
+
+A gap that can hide findings stops the history write for its repository: an `upstream` gap from
+a failed OSV query, an `unreadable` or `unsupported` lockfile, an `unresolved` advisory or
+package. The row that run would write is missing findings, and the next complete run would
+report them as NEW. The previous row stays the one the next run compares against. A gap that
+cannot hide a finding does not stop the write: `severity` and `range` qualify a finding that was
+reported, and a KEV or EPSS feed outage or a Dockerfile build line douane could not read only
+leave a label off one.
+
+A repository whose gap does not clear on a retry, such as an `unsupported` `pnpm-lock.yaml`
+beside a `go.mod`, keeps its last complete row until the gap goes, so findings that appear
+meanwhile read NEW on every run. Remove or convert the lockfile to get the history moving again.
 
 ## Using douane in CI
 
