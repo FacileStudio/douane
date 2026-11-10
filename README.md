@@ -233,3 +233,7 @@ See [ROADMAP.md](ROADMAP.md).
 Findings are a live map of your attack surface. The sweep database and any inventory are
 gitignored and must stay that way, including in fixtures and examples. A scanned project's
 `douane.yml` is the exception and belongs in that project's history.
+
+## License
+
+douane is released under the [GNU General Public License v3.0 only](LICENSE) (`GPL-3.0-only`).
