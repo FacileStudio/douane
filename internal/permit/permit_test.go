@@ -63,7 +63,7 @@ func TestParseRefusesWithTheLine(t *testing.T) {
 		{"twice", "permits:\n  - id: X\n    id: Y\n", 3, "set twice"},
 		{"tabs", "permits:\n\t- id: X\n", 2, "tabs"},
 		{"other root", "ignore:\n  - X\n", 1, "only permits"},
-		{"block scalar", "permits:\n  - id: X\n    reason: >\n", 3, "unsupported"},
+		{"block scalar", "permits:\n  - id: X\n    reason: >\n", 3, "quote a value"},
 		{"misaligned", "permits:\n  - id: X\n   reason: r\n", 3, "line up"},
 		{"colon", "permits:\n  - id: X\n    reason: a: b\n", 3, "colon"},
 	}

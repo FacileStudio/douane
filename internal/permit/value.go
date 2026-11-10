@@ -10,13 +10,11 @@ import (
 
 const dateLayout = "2006-01-02"
 
-// errUnsupported is the answer for every YAML construct the file has no use
-// for. Anchors, tags, block scalars and flow collections would each need a
-// real YAML reader to mean what the author meant.
-var errUnsupported = errors.New("unsupported YAML value, write it plain or in quotes on one line")
-
 // scalar decodes one value: plain, single-quoted or double-quoted, with an
-// optional trailing comment.
+// optional trailing comment. A plain value may not open with a character YAML
+// reads as an anchor, a tag, a block scalar or a flow collection: each would
+// need a real YAML reader to mean what the author meant, and quoting it says
+// the same thing in the subset this file speaks. An npm scope's @ is one.
 func scalar(raw string) (string, error) {
 	v := strings.TrimSpace(raw)
 	switch {
@@ -27,7 +25,7 @@ func scalar(raw string) (string, error) {
 	case v[0] == '\'':
 		return singleQuoted(v)
 	case strings.ContainsRune("[{|>&*!%@`", rune(v[0])):
-		return "", errUnsupported
+		return "", fmt.Errorf("quote a value that starts with %q, YAML reads it as something else", v[0])
 	}
 	v = strings.TrimSpace(stripComment(v))
 	if strings.Contains(v, ": ") || strings.HasSuffix(v, ":") {
