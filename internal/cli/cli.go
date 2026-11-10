@@ -150,9 +150,7 @@ func scanOne(ctx context.Context, opts options, st *store.Store) (output.Report,
 		report.Warnings = append(report.Warnings, enrichWarnings(res)...)
 		report.Gaps = append(report.Gaps, res.Gaps...)
 	}
-	finding.Rank(report.Findings)
-	report.Findings = finding.FilterScope(report.Findings, opts.scopeFilter())
-	report.Findings = finding.FilterInformational(report.Findings, opts.informational == "ignore")
+	narrow(&report, opts.scopeFilter(), opts.informational == "ignore")
 	record(st, &report)
 	return report, exitClear
 }

@@ -26,6 +26,7 @@ type findingJSON struct {
 // reportJSON is one scan as json. Complete is the field that separates
 // "nothing held" from "douane could not tell", and findings and gaps are
 // always arrays so a consumer can count them without a null check.
+// out_of_scope_gaps lists the gaps -scope set aside, present only when one was.
 type reportJSON struct {
 	SchemaVersion string          `json:"schema_version,omitempty"`
 	Name          string          `json:"name,omitempty"`
@@ -37,6 +38,7 @@ type reportJSON struct {
 	Permitted     []permittedJSON `json:"permitted"`
 	Groups        []finding.Group `json:"groups"`
 	Gaps          []finding.Gap   `json:"gaps"`
+	OutOfScope    []finding.Gap   `json:"out_of_scope_gaps,omitempty"`
 	Warnings      []string        `json:"warnings,omitempty"`
 }
 
@@ -46,6 +48,7 @@ type sweepJSON struct {
 	Complete      bool          `json:"complete"`
 	Repos         []reportJSON  `json:"repos"`
 	Gaps          []finding.Gap `json:"gaps"`
+	OutOfScope    []finding.Gap `json:"out_of_scope_gaps,omitempty"`
 	Warnings      []string      `json:"warnings,omitempty"`
 }
 
@@ -69,7 +72,7 @@ func reportBody(r Report) reportJSON {
 	return reportJSON{Name: r.Name, Target: r.Target, Packages: r.Packages,
 		Complete: r.Complete(), Failed: r.Failed, Findings: fs,
 		Permitted: permittedBody(r.Permitted), Groups: groups,
-		Gaps: gaps, Warnings: r.Warnings}
+		Gaps: gaps, OutOfScope: r.OutOfScope, Warnings: r.Warnings}
 }
 
 // MarshalJSON emits a scan as its own document, schema version and all.
@@ -90,7 +93,8 @@ func (s Sweep) MarshalJSON() ([]byte, error) {
 		gaps = []finding.Gap{}
 	}
 	return json.Marshal(sweepJSON{SchemaVersion: SchemaVersion, Root: s.Root,
-		Complete: s.Complete(), Repos: repos, Gaps: gaps, Warnings: s.Warnings})
+		Complete: s.Complete(), Repos: repos, Gaps: gaps,
+		OutOfScope: s.OutOfScope, Warnings: s.Warnings})
 }
 
 func encodeJSON(w io.Writer, v any) error {

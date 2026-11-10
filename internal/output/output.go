@@ -73,6 +73,10 @@ type Report struct {
 	Permitted   []permit.Match  `json:"-"`
 	Expired     map[string]bool `json:"-"`
 	PermitNotes []string        `json:"-"`
+
+	// OutOfScope are the gaps that concerned only findings -scope filtered
+	// out. They no longer count against the run and stay in the json.
+	OutOfScope []finding.Gap `json:"-"`
 }
 
 // Complete reports whether douane determined everything it set out to. An

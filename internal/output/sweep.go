@@ -14,6 +14,10 @@ type Sweep struct {
 	Repos    []Report      `json:"repos"`
 	Gaps     []finding.Gap `json:"gaps,omitempty"`
 	Warnings []string      `json:"warnings,omitempty"`
+
+	// OutOfScope are the fleet gaps that concerned only findings -scope
+	// filtered out of every repository, as on Report.
+	OutOfScope []finding.Gap `json:"-"`
 }
 
 // AllGaps returns every gap in the run, the fleet's own and each repo's, once
