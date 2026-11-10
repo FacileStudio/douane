@@ -11,7 +11,7 @@ import (
 func bodyServer(t *testing.T, body string) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(body))
+		w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
 	return srv.URL
