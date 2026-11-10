@@ -28,7 +28,9 @@ func runSweep(args []string) int {
 	if st != nil {
 		defer st.Close()
 	}
-	result, code := sweepAll(context.Background(), opts, st)
+	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
+	defer cancel()
+	result, code := sweepAll(ctx, opts, st)
 	if code != exitClear {
 		return code
 	}

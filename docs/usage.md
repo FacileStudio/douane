@@ -16,6 +16,7 @@ Defaults to the current directory.
 | `-db` | path, or `""` | `~/.douane.db` | Sweep history; `""` disables it |
 | `-no-enrich` | — | off | Skip the KEV and EPSS feeds |
 | `-refresh` | — | off | Refetch the feeds, ignoring the cache |
+| `-timeout` | a Go duration, such as `10m` or `90s` | `10m` | Stop the whole run after this long; requests that hit it become gaps |
 
 The path may be given before or after the flags, so `douane scan -fail high /repos` and
 `douane scan /repos -fail high` scan the same directory. A second path is a usage error.

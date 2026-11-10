@@ -37,6 +37,7 @@ Flags:
   -db     path to the sweep database (default ~/.douane.db, "" to disable)
   -no-enrich                    skip the KEV and EPSS feeds
   -refresh                      refetch the feeds, ignoring the cache
+  -timeout duration             stop the whole run after this long (default 10m)
   --version                     print the version and exit
 
 Exit codes:
@@ -78,7 +79,9 @@ func runScan(args []string) int {
 	if st != nil {
 		defer st.Close()
 	}
-	report, code := scanOne(context.Background(), opts, st)
+	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
+	defer cancel()
+	report, code := scanOne(ctx, opts, st)
 	if code != exitClear {
 		return code
 	}
