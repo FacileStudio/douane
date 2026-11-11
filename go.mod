@@ -1,6 +1,6 @@
 module github.com/FacileStudio/douane
 
-go 1.26
+go 1.26.11
 
 require modernc.org/sqlite v1.57.0
 
