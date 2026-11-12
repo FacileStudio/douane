@@ -37,8 +37,9 @@ type threshold struct {
 // history marks findings unseen by the previous sweep of this target and
 // records the current one. The store is passed in already open: a fleet sweep
 // reuses one handle for every repo, and it is the same handle the feed cache
-// lives in.
-func history(st *store.Store, report *output.Report) error {
+// lives in. carry keeps the previous sweep's findings in the new row, for a
+// run that could not see everything the previous one did.
+func history(st *store.Store, report *output.Report, carry bool) error {
 	previous, err := st.PreviousKeys(report.Target)
 	if err != nil {
 		return err
@@ -48,7 +49,7 @@ func history(st *store.Store, report *output.Report) error {
 			report.New[f.Key()] = true
 		}
 	}
-	return st.Save(report.Target, report.Packages, report.Findings)
+	return st.Save(report.Target, report.Packages, report.Findings, carry)
 }
 
 // seenBefore reports whether the previous sweep held this flaw under any of its
@@ -69,20 +70,19 @@ func seenBefore(previous map[string]bool, f finding.Finding) bool {
 
 // record files this run so the next one can say what is new. A history that
 // cannot be written costs the NEW badge, never the scan, so it degrades to a
-// warning rather than an exit code. A repository that failed, yielded no
-// package to inspect, or carries a gap that can hide findings files nothing:
-// a row missing findings would stand as its newest sweep, and the next
-// complete run would call every finding it missed new. Its previous row stays
-// the one the next run is compared against. A gap that only qualifies a
-// reported finding, such as a missing severity, does not stop the write.
+// warning rather than an exit code. A repository that failed or yielded no
+// package to inspect files nothing, and its previous row stays the one the
+// next run is compared against. A gap that can hide findings, such as an
+// unsupported lockfile beside a readable one, still files what this run saw,
+// with the previous row's findings carried into it: dropping them would make
+// the next complete run call them new, and skipping the write would make a
+// gap that never clears freeze the history, so every later finding read new.
 func record(st *store.Store, report *output.Report) {
 	if st == nil || report.Failed || report.Packages == 0 {
 		return
 	}
-	if slices.ContainsFunc(report.Gaps, finding.Gap.HidesFindings) {
-		return
-	}
-	if err := history(st, report); err != nil {
+	carry := slices.ContainsFunc(report.Gaps, finding.Gap.HidesFindings)
+	if err := history(st, report, carry); err != nil {
 		report.Warnings = append(report.Warnings,
 			fmt.Sprintf("sweep history unavailable: %v", err))
 	}

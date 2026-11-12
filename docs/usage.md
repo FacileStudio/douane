@@ -263,17 +263,20 @@ An `unsupported` gap is the one to act on rather than retry: it will still be th
 
 ### Gaps and the history
 
-A gap that can hide findings stops the history write for its repository: an `upstream` gap from
-a failed OSV query, an `unreadable` or `unsupported` lockfile, an `unresolved` advisory or
-package. The row that run would write is missing findings, and the next complete run would
-report them as NEW. The previous row stays the one the next run compares against. A gap that
-cannot hide a finding does not stop the write: `severity` and `range` qualify a finding that was
-reported, and a KEV or EPSS feed outage or a Dockerfile build line douane could not read only
-leave a label off one.
+A gap that can hide findings still writes the history row for its repository: an `upstream` gap
+from a failed OSV query, an `unreadable` or `unsupported` lockfile, an `unresolved` advisory or
+package. The row holds every finding this run reported, plus every finding the previous row held
+that this run did not report. douane cannot tell a finding that was fixed from one it could not
+see, so it keeps both. The next run then marks NEW only what neither row held. A gap that cannot
+hide a finding writes a plain row: `severity` and `range` qualify a finding that was reported, and
+a KEV or EPSS feed outage or a Dockerfile build line douane could not read only leave a label off
+one.
 
-A repository whose gap does not clear on a retry, such as an `unsupported` `pnpm-lock.yaml`
-beside a `go.mod`, keeps its last complete row until the gap goes, so findings that appear
-meanwhile read NEW on every run. Remove or convert the lockfile to get the history moving again.
+A gap that does not clear on a retry, such as an `unsupported` `pnpm-lock.yaml` beside a
+`go.mod`, no longer freezes the history. The findings douane can scan are marked NEW once and
+seen afterwards. A finding fixed while such a gap stands stays in the carried row, so it reads as
+seen, not NEW, if it comes back before a complete run. The gap is still reported and still
+counts toward exit 3.
 
 ## Using douane in CI
 

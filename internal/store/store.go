@@ -70,8 +70,11 @@ func (s *Store) PreviousKeys(target string) (map[string]bool, error) {
 }
 
 // Save records one sweep and its findings, then drops the sweeps that have
-// aged out of the window.
-func (s *Store) Save(target string, packages int, fs []finding.Finding) error {
+// aged out of the window. carry also copies forward every finding the
+// previous sweep of target held and fs does not: a run that could not see the
+// whole target still records what it found, without forgetting what it could
+// not look at.
+func (s *Store) Save(target string, packages int, fs []finding.Finding, carry bool) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -89,6 +92,11 @@ func (s *Store) Save(target string, packages int, fs []finding.Finding) error {
 	}
 	if err := insert(tx, sweepID, fs); err != nil {
 		return err
+	}
+	if carry {
+		if err := carryForward(tx, target, sweepID); err != nil {
+			return err
+		}
 	}
 	if err := prune(tx, target); err != nil {
 		return err
@@ -111,6 +119,17 @@ func insert(tx *sql.Tx, sweepID int64, fs []finding.Finding) error {
 		}
 	}
 	return nil
+}
+
+func carryForward(tx *sql.Tx, target string, sweepID int64) error {
+	_, err := tx.Exec(`INSERT INTO findings
+		(sweep_id, key, id, package, ecosystem, installed, fixed_in, severity, kev, epss)
+		SELECT ?, key, id, package, ecosystem, installed, fixed_in, severity, kev, epss
+		FROM findings WHERE sweep_id =
+			(SELECT id FROM sweeps WHERE target = ? AND id < ? ORDER BY id DESC LIMIT 1)
+		AND key NOT IN (SELECT key FROM findings WHERE sweep_id = ?)`,
+		sweepID, target, sweepID, sweepID)
+	return err
 }
 
 // prune drops every sweep of target past the newest keepSweeps. Their findings

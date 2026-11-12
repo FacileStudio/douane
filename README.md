@@ -142,9 +142,9 @@ came back an error, a lockfile it cannot parse, an ecosystem it cannot read. CI 
 tell "you are vulnerable" from "I could not tell" and retry the second before blocking on
 it.
 
-A gap that can hide findings, such as a failed OSV query or an unreadable lockfile, also keeps
-that repository from writing its history row, so the next complete run does not call what this
-one missed NEW.
+A gap that can hide findings, such as a failed OSV query or an unreadable lockfile, still lets
+that repository write its history row, with the previous row's findings carried into it. What
+this run saw stops reading NEW, and the next complete run does not call what this one missed NEW.
 
 Findings still outrank incompleteness. A run that has both exits 1, because both block and
 "you are vulnerable" is the finished answer. Under `-fail never` the gaps print and appear

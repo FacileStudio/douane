@@ -3,9 +3,11 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/FacileStudio/douane/internal/finding"
+	"github.com/FacileStudio/douane/internal/inventory"
 	"github.com/FacileStudio/douane/internal/output"
 	"github.com/FacileStudio/douane/internal/permit"
 	"github.com/FacileStudio/douane/internal/store"
@@ -64,7 +66,7 @@ func TestASkippedRepoKeepsItsPreviousHistory(t *testing.T) {
 			t.Fatal(err)
 		}
 		held := flawNamedBoth("CVE")
-		if err := st.Save(repo, 3, []finding.Finding{held}); err != nil {
+		if err := st.Save(repo, 3, []finding.Finding{held}, false); err != nil {
 			t.Fatal(err)
 		}
 		st.Close()
@@ -87,7 +89,7 @@ func recordOver(t *testing.T, gap finding.Gap) map[string]bool {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	if err := st.Save("/app", 3, []finding.Finding{flawNamedBoth("CVE")}); err != nil {
+	if err := st.Save("/app", 3, []finding.Finding{flawNamedBoth("CVE")}, false); err != nil {
 		t.Fatal(err)
 	}
 	other := finding.Finding{Ecosystem: "npm", Package: "devalue", Installed: "5.8.0", ID: "CVE-2026-999"}
@@ -101,7 +103,7 @@ func recordOver(t *testing.T, gap finding.Gap) map[string]bool {
 	return previous
 }
 
-func TestAGapThatCanHideFindingsKeepsThePreviousHistory(t *testing.T) {
+func TestAGapThatCanHideFindingsCarriesThePreviousHistory(t *testing.T) {
 	held := flawNamedBoth("CVE").Key()
 	for _, gap := range []finding.Gap{
 		{Kind: finding.GapUpstream, Subject: "golang.org/x/crypto", Detail: "osv query failed"},
@@ -109,9 +111,40 @@ func TestAGapThatCanHideFindingsKeepsThePreviousHistory(t *testing.T) {
 		{Kind: finding.GapUnsupported, Subject: "pnpm-lock.yaml", Detail: "unsupported"},
 		{Kind: finding.GapUnresolved, Subject: "GHSA-xxxx", Detail: "fetch failed"},
 	} {
-		if previous := recordOver(t, gap); !previous[held] || len(previous) != 1 {
-			t.Errorf("%s: previous = %v, want the earlier row kept", gap.Kind, previous)
+		if previous := recordOver(t, gap); !previous[held] || len(previous) != 2 {
+			t.Errorf("%s: previous = %v, want the earlier finding kept and this run's added", gap.Kind, previous)
 		}
+	}
+}
+
+func TestAnUnsupportedLockfileLetsTheScannableFindingBeSeen(t *testing.T) {
+	repo := t.TempDir()
+	write(t, filepath.Join(repo, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
+	write(t, filepath.Join(repo, "go.mod"), "module example.com/app\n\ngo 1.26\n\nrequire golang.org/x/net v0.1.0\n")
+	st, err := store.Open(filepath.Join(t.TempDir(), "douane.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	run := func() output.Report {
+		pkgs, gaps, err := inventory.Scan(repo, inventory.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		report := output.Report{Target: repo, Packages: len(pkgs), New: map[string]bool{}, Gaps: gaps,
+			Findings: []finding.Finding{{Ecosystem: "Go", Package: "golang.org/x/net", Installed: "v0.1.0", ID: "GO-2026-0001"}}}
+		record(st, &report)
+		return report
+	}
+	first := run()
+	if !slices.ContainsFunc(first.Gaps, func(g finding.Gap) bool { return g.Kind == finding.GapUnsupported }) {
+		t.Fatalf("gaps = %v, want the pnpm lockfile reported as unsupported", first.Gaps)
+	}
+	if len(first.New) != 1 {
+		t.Fatalf("first run marked %v new, want the go.mod finding", first.New)
+	}
+	if second := run(); len(second.New) != 0 {
+		t.Fatalf("second run marked %v new; the unsupported lockfile froze the history", second.New)
 	}
 }
 

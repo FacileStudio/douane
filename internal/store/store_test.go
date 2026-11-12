@@ -64,7 +64,7 @@ func TestOpenSurvivesAnAwkwardPath(t *testing.T) {
 		t.Fatalf("open %q: %v", path, err)
 	}
 	defer st.Close()
-	if err := st.Save("t", 1, stFindings(1)); err != nil {
+	if err := st.Save("t", 1, stFindings(1), false); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -75,7 +75,7 @@ func TestOpenSurvivesAnAwkwardPath(t *testing.T) {
 func TestSaveKeepsOnlyTheLastSweeps(t *testing.T) {
 	st := open(t)
 	for i := range keepSweeps + 5 {
-		if err := st.Save("target", i, stFindings(3)); err != nil {
+		if err := st.Save("target", i, stFindings(3), false); err != nil {
 			t.Fatalf("save %d: %v", i, err)
 		}
 	}
@@ -94,11 +94,11 @@ func TestSaveKeepsOnlyTheLastSweeps(t *testing.T) {
 
 func TestPruneLeavesOtherTargetsAlone(t *testing.T) {
 	st := open(t)
-	if err := st.Save("kept", 1, stFindings(2)); err != nil {
+	if err := st.Save("kept", 1, stFindings(2), false); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	for i := range keepSweeps + 3 {
-		if err := st.Save("churned", i, stFindings(1)); err != nil {
+		if err := st.Save("churned", i, stFindings(1), false); err != nil {
 			t.Fatalf("save %d: %v", i, err)
 		}
 	}

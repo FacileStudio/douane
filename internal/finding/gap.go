@@ -40,8 +40,9 @@ type Gap struct {
 // HidesFindings is the one place gaps are classified by what they can cost.
 // It reports whether g can stand for findings douane never saw: a vulnerability
 // query that failed, a lockfile it could not read or does not support, an
-// advisory or package it could not resolve. Those keep a run from writing the
-// history it would compare the next one against. A severity or range gap only
+// advisory or package it could not resolve. A run carrying one keeps the
+// findings its previous history row held, because it cannot tell which of them
+// are gone and which it simply did not see. A severity or range gap only
 // qualifies a finding that was reported, and an annotation gap only a label on
 // one, so neither hides anything. An unknown kind hides, because guessing the
 // other way would let a new kind of hole pass as a complete answer.

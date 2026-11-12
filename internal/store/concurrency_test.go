@@ -30,7 +30,7 @@ func stWrite(st *Store, target string, each int, count func(error)) {
 		if _, err := st.PreviousKeys(target); err != nil {
 			count(err)
 		}
-		if err := st.Save(target, 1, stFindings(4)); err != nil {
+		if err := st.Save(target, 1, stFindings(4), false); err != nil {
 			count(err)
 		}
 	}
