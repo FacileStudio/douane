@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.4] - 2026-11-12
+
+### Fixed
+- A gap that can hide findings no longer blocks the history write. A repository with an `unsupported` lockfile beside a readable one, such as a `pnpm-lock.yaml` next to a `go.mod`, never wrote a history row and never marked a finding NEW, so the first run after the gap cleared reported everything found since as NEW at once. The row is now written with every finding the run reported, plus the previous row's findings the run did not report, because douane cannot tell a fixed finding from one it could not see. The same applies to `upstream`, `unreadable` and `unresolved` gaps, through the one path in `record`. Gaps and exit codes are unchanged.
+
+### Changed
+- build: `mise.lock` pins Go 1.26.11, matching `mise.toml` and `go.mod`. It still pinned 1.25.14.
+
 ## [v0.7.3] - 2026-11-11
 
 ### Security
