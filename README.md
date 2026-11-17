@@ -33,7 +33,7 @@ ago and have since been found dangerous. That is exactly the job.
 curl -fsSL https://raw.githubusercontent.com/FacileStudio/douane/main/install.sh | bash
 ```
 
-That is a shim for `facile install douane`, the suite installer. On macOS,
+That is a shim for `kit add douane`, the Facile package manager. On macOS,
 Homebrew works too once the tap is populated:
 
 ```sh
